@@ -89,6 +89,11 @@ export function createClient() {
             },
           },
         },
+        cookieOptions: {
+          path: '/',
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
+        },
       }
     )
   } catch (error) {

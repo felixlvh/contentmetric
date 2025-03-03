@@ -25,6 +25,7 @@ const publicRoutes = [
   '/static',
   '/images',
   '/favicon.ico',
+  '/auth/callback',
 ]
 
 const getSupabaseUrl = () => {
@@ -82,6 +83,7 @@ export async function middleware(request: NextRequest) {
                 options.secure = true;
                 options.sameSite = 'lax';
                 options.domain = request.headers.get('host')?.split(':')[0];
+                options.path = '/';
               }
               
               response.cookies.set({
@@ -100,6 +102,7 @@ export async function middleware(request: NextRequest) {
                 options.secure = true;
                 options.sameSite = 'lax';
                 options.domain = request.headers.get('host')?.split(':')[0];
+                options.path = '/';
               }
               
               response.cookies.set({
@@ -117,13 +120,20 @@ export async function middleware(request: NextRequest) {
     )
     
     // Check if the user is authenticated
-    const { data: { user }, error } = await supabase.auth.getUser()
-    if (error) {
-      console.error('Error getting user in middleware:', error)
-      // Don't throw the error, just consider the user as not authenticated
+    let isAuthenticated = false;
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (error) {
+        if (error.name === 'AuthSessionMissingError') {
+          console.log('No auth session found, user is not authenticated')
+        } else {
+          console.error('Error getting user in middleware:', error)
+        }
+      }
+      isAuthenticated = !!user
+    } catch (error) {
+      console.error('Unexpected error checking authentication:', error)
     }
-    
-    const isAuthenticated = !!user
 
     // Prevent redirect loops
     const isRedirectLoop = request.headers.get('x-middleware-redirect') === 'true'

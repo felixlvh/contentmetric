@@ -49,6 +49,7 @@ export default function BrandVoiceDetailsPage() {
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [generatedContentWithBrandVoice, setGeneratedContentWithBrandVoice] = useState<string | null>(null);
   const [generatedContentWithoutBrandVoice, setGeneratedContentWithoutBrandVoice] = useState<string | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (params && params.id) {
@@ -62,7 +63,19 @@ export default function BrandVoiceDetailsPage() {
       const response = await fetch(`/api/brand-voice/${id}`);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch brand voice details');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        
+        // Check if it's an authentication error
+        if (response.status === 401 || (errorData.error && errorData.error.includes('Unauthorized'))) {
+          console.error('Authentication error:', errorData.error);
+          setError('You need to be logged in to view this brand voice. Please log in and try again.');
+          throw new Error('Authentication error: ' + errorData.error);
+        }
+        
+        // Handle other errors
+        console.error('Error fetching brand voice:', errorData.error);
+        setError(errorData.error || 'Failed to fetch brand voice details');
+        throw new Error(errorData.error || 'Failed to fetch brand voice details');
       }
       
       const data = await response.json();
@@ -292,9 +305,28 @@ export default function BrandVoiceDetailsPage() {
       return; // Don't generate if no topic or no brand voice ID
     }
     
+    // Reset any previous errors
+    setGenerationError(null);
+    
     try {
       // Set loading state
       setIsGeneratingContent(true);
+      
+      // Check if we have the brand voice data first
+      if (!brandVoice) {
+        try {
+          // Try to fetch the brand voice again
+          await fetchBrandVoice(params.id as string);
+        } catch (fetchError) {
+          console.error('Error fetching brand voice:', fetchError);
+          throw new Error('Could not fetch brand voice details. Please try refreshing the page.');
+        }
+        
+        // If still no brand voice after fetching, throw error
+        if (!brandVoice) {
+          throw new Error('Brand voice details not available. Please try refreshing the page.');
+        }
+      }
       
       // Generate content WITH brand voice
       const withBrandVoiceResponse = await fetch('/api/brand-voice-preview', {
@@ -311,11 +343,25 @@ export default function BrandVoiceDetailsPage() {
         }),
       });
       
+      let withBrandVoiceData;
+      
       if (!withBrandVoiceResponse.ok) {
-        throw new Error('Failed to generate content with brand voice');
+        const errorData = await withBrandVoiceResponse.json().catch(() => ({ error: 'Unknown error' }));
+        
+        // If it's an authentication error, try to refresh the page
+        if (errorData.error && errorData.error.includes('Authentication')) {
+          throw new Error('Authentication error. Please try refreshing the page and logging in again.');
+        }
+        
+        throw new Error(errorData.error || 'Failed to generate content with brand voice');
       }
       
-      const withBrandVoiceData = await withBrandVoiceResponse.json();
+      try {
+        withBrandVoiceData = await withBrandVoiceResponse.json();
+      } catch (parseError) {
+        console.error('Error parsing brand voice response:', parseError);
+        throw new Error('Failed to parse response from server');
+      }
       
       // Generate content WITHOUT brand voice
       const withoutBrandVoiceResponse = await fetch('/api/brand-voice-preview', {
@@ -332,11 +378,19 @@ export default function BrandVoiceDetailsPage() {
         }),
       });
       
+      let withoutBrandVoiceData;
+      
       if (!withoutBrandVoiceResponse.ok) {
-        throw new Error('Failed to generate content without brand voice');
+        const errorData = await withoutBrandVoiceResponse.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to generate content without brand voice');
       }
       
-      const withoutBrandVoiceData = await withoutBrandVoiceResponse.json();
+      try {
+        withoutBrandVoiceData = await withoutBrandVoiceResponse.json();
+      } catch (parseError) {
+        console.error('Error parsing response without brand voice:', parseError);
+        throw new Error('Failed to parse response from server');
+      }
       
       // Update the state with generated content
       setGeneratedContentWithBrandVoice(withBrandVoiceData.content);
@@ -345,10 +399,56 @@ export default function BrandVoiceDetailsPage() {
     } catch (error) {
       console.error('Error generating content:', error);
       // Set error state or show error message
+      setGenerationError(error instanceof Error ? error.message : 'Failed to generate content');
     } finally {
       // Clear loading state
       setIsGeneratingContent(false);
     }
+  };
+
+  // Add this near where you render the preview modal content
+  const renderPreviewContent = () => {
+    if (isGeneratingContent) {
+      return (
+        <div className="flex items-center justify-center p-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      );
+    }
+    
+    if (generationError) {
+      return (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
+          <p className="font-medium">Generation Error</p>
+          <p>{generationError}</p>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="border rounded-lg p-4">
+          <h3 className="text-lg font-semibold mb-2">With Brand Voice</h3>
+          <div className="prose max-w-none">
+            {generatedContentWithBrandVoice ? (
+              <div dangerouslySetInnerHTML={{ __html: generatedContentWithBrandVoice }} />
+            ) : (
+              <p className="text-gray-500">No content generated yet</p>
+            )}
+          </div>
+        </div>
+        <div className="border rounded-lg p-4">
+          <h3 className="text-lg font-semibold mb-2">Without Brand Voice</h3>
+          <div className="prose max-w-none">
+            {generatedContentWithoutBrandVoice ? (
+              <div dangerouslySetInnerHTML={{ __html: generatedContentWithoutBrandVoice }} />
+            ) : (
+              <p className="text-gray-500">No content generated yet</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   if (isLoading) {
@@ -851,70 +951,8 @@ export default function BrandVoiceDetailsPage() {
               </div>
               
               {/* Right column - Preview comparison */}
-              <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* With Brand Voice */}
-                <div className="border border-purple-100 rounded-lg overflow-hidden flex flex-col h-full">
-                  <div className="bg-purple-50 px-4 py-2 flex justify-between items-center">
-                    <h3 className="font-medium text-sm">Sample {previewContentType}</h3>
-                    <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">WITH BRAND VOICE APPLIED</span>
-                  </div>
-                  <div className="p-4 overflow-y-auto overflow-x-hidden flex-grow">
-                    {generatedContentWithBrandVoice ? (
-                      <div className="prose prose-xs max-w-none break-words text-sm">
-                        {generatedContentWithBrandVoice.split('\n').map((line, index) => (
-                          <p key={index} className={line.startsWith('#') ? 'font-bold text-base mt-2' : line.startsWith('##') ? 'font-semibold text-sm mt-2' : line.startsWith('*') ? 'italic text-xs text-gray-600 mt-2' : 'mt-2 text-xs'}>
-                            {line.replace(/^#+ /, '')}
-                          </p>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {/* Placeholder content */}
-                        <div className="h-6 bg-gray-200 rounded w-3/4"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                        <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                        <div className="h-32 bg-gray-200 rounded w-full"></div>
-                        <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Without Brand Voice */}
-                <div className="border border-gray-200 rounded-lg overflow-hidden flex flex-col h-full">
-                  <div className="bg-gray-50 px-4 py-2 flex justify-between items-center">
-                    <h3 className="font-medium text-sm">Sample {previewContentType}</h3>
-                    <span className="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded">WITHOUT BRAND VOICE APPLIED</span>
-                  </div>
-                  <div className="p-4 overflow-y-auto overflow-x-hidden flex-grow">
-                    {generatedContentWithoutBrandVoice ? (
-                      <div className="prose prose-xs max-w-none break-words text-sm">
-                        {generatedContentWithoutBrandVoice.split('\n').map((line, index) => (
-                          <p key={index} className={line.startsWith('#') ? 'font-bold text-base mt-2' : line.startsWith('##') ? 'font-semibold text-sm mt-2' : line.startsWith('*') ? 'italic text-xs text-gray-600 mt-2' : 'mt-2 text-xs'}>
-                            {line.replace(/^#+ /, '')}
-                          </p>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {/* Placeholder content */}
-                        <div className="h-6 bg-gray-200 rounded w-3/4"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                        <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                        <div className="h-32 bg-gray-200 rounded w-full"></div>
-                        <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+              <div className="lg:col-span-2">
+                {renderPreviewContent()}
               </div>
             </div>
           </div>

@@ -1,12 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { login, signup, loginWithMagicLink } from './actions';
 
 export default function LoginPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
@@ -14,14 +13,14 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState<string | null>(
-    searchParams.get('message') || null
+    searchParams?.get('message') || null
   );
   const [error, setError] = useState<string | null>(
-    searchParams.get('error') || null
+    searchParams?.get('error') || null
   );
 
   // Get the redirect path from the URL
-  const redirectTo = searchParams.get('redirect') || '/dashboard';
+  const redirectTo = searchParams?.get('redirect') || '/dashboard';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

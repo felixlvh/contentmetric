@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createClient as createServerClient } from '@/utils/supabase/server';
 import { callOpenAI } from '@/lib/agent/models/openai';
 import { getContentTypeConfig } from '@/lib/agent/core/config';
 
@@ -22,23 +23,68 @@ export async function POST(request: Request) {
       );
     }
     
-    // Initialize Supabase client without cookies (anonymous client)
-    // This works for public data or when authentication isn't required
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    // Try to use the authenticated server client first
+    let supabase;
+    let brandVoice;
+    let brandVoiceError;
     
-    // Fetch the brand voice details
-    const { data: brandVoice, error: brandVoiceError } = await supabase
-      .from('brand_voices')
-      .select('*')
-      .eq('id', brandVoiceId)
-      .single();
+    try {
+      // First try with authenticated server client
+      supabase = await createServerClient();
+      const result = await supabase
+        .from('brand_voices')
+        .select('*')
+        .eq('id', brandVoiceId)
+        .single();
+        
+      brandVoice = result.data;
+      brandVoiceError = result.error;
+    } catch (authError) {
+      console.error('Authentication error, falling back to anonymous client:', authError);
       
-    if (brandVoiceError || !brandVoice) {
+      // Fall back to anonymous client if authentication fails
+      supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      
+      // Try to fetch the brand voice with anonymous client
+      const result = await supabase
+        .from('brand_voices')
+        .select('*')
+        .eq('id', brandVoiceId)
+        .single();
+        
+      brandVoice = result.data;
+      brandVoiceError = result.error;
+    }
+    
+    // Handle errors from either client
+    if (brandVoiceError) {
+      console.error('Error fetching brand voice:', brandVoiceError);
+      
+      // Check for specific error types
+      if (brandVoiceError.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Brand voice not found' },
+          { status: 404 }
+        );
+      } else if (brandVoiceError.message?.includes('auth')) {
+        return NextResponse.json(
+          { error: 'Authentication error: ' + brandVoiceError.message },
+          { status: 401 }
+        );
+      }
+      
       return NextResponse.json(
-        { error: 'Failed to fetch brand voice details' },
+        { error: 'Failed to fetch brand voice details: ' + brandVoiceError.message },
+        { status: 500 }
+      );
+    }
+    
+    if (!brandVoice) {
+      return NextResponse.json(
+        { error: 'Brand voice not found' },
         { status: 404 }
       );
     }
@@ -103,9 +149,37 @@ export async function POST(request: Request) {
     
   } catch (error) {
     console.error('Error generating brand voice preview:', error);
+    
+    // More detailed error response
+    let errorMessage = 'Failed to generate preview content';
+    let statusCode = 500;
+    
+    if (error instanceof Error) {
+      // Log the full error details for debugging
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      errorMessage = error.message;
+      
+      // Check for specific OpenAI error types
+      if (error.message.includes('API key')) {
+        errorMessage = 'OpenAI API key issue: ' + error.message;
+        statusCode = 401;
+      } else if (error.message.includes('rate limit')) {
+        errorMessage = 'OpenAI rate limit exceeded. Please try again later.';
+        statusCode = 429;
+      } else if (error.message.includes('model')) {
+        errorMessage = 'AI model issue: ' + error.message;
+        statusCode = 400;
+      }
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to generate preview content' },
-      { status: 500 }
+      { error: errorMessage },
+      { status: statusCode }
     );
   }
 } 

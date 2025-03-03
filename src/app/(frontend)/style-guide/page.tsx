@@ -2,6 +2,29 @@ import React from 'react';
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 
+interface TerminologyItem {
+  term: string;
+  alternatives?: string[];
+}
+
+interface StyleGuide {
+  id: string;
+  name: string;
+  grammar_rules: string;
+  terminology: {
+    preferred: TerminologyItem[];
+    avoid: string[];
+  };
+  formatting: {
+    headings: string;
+    lists: string;
+    emphasis: string;
+  };
+  capitalization: string;
+  punctuation: string;
+  isActive: boolean;
+}
+
 export default async function StyleGuidePage() {
   const supabase = await createClient();
   
@@ -25,7 +48,7 @@ export default async function StyleGuidePage() {
   }
   
   // Use template style guides if user doesn't have any
-  const styleGuides = userStyleGuides && userStyleGuides.length > 0 
+  const styleGuides: StyleGuide[] = userStyleGuides && userStyleGuides.length > 0 
     ? userStyleGuides 
     : [
       {
@@ -148,7 +171,7 @@ export default async function StyleGuidePage() {
                   <div className="mt-2">
                     <h5 className="text-xs font-medium text-gray-600">Preferred Terms</h5>
                     <div className="mt-1 space-y-1">
-                      {guide.terminology.preferred.map((item, index) => (
+                      {guide.terminology.preferred.map((item: TerminologyItem, index: number) => (
                         <div key={index} className="text-sm">
                           <span className="font-medium text-gray-700">{item.term}</span>
                           {item.alternatives && (

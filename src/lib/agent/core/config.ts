@@ -11,6 +11,7 @@
 export enum AIModel {
   GPT35Turbo = 'gpt-3.5-turbo',
   GPT4Turbo = 'gpt-4-turbo',
+  GPT4TurboSpecific = 'gpt-4-turbo-2024-04-09',
   GPT4OMini = 'gpt-4o-mini-2024-07-18',
   GPT4 = 'gpt-4',
 }
@@ -18,7 +19,7 @@ export enum AIModel {
 /**
  * Default model to use when not specified
  */
-export const DEFAULT_MODEL = AIModel.GPT4OMini;
+export const DEFAULT_MODEL = AIModel.GPT4TurboSpecific;
 
 /**
  * Configuration for content types
@@ -42,32 +43,32 @@ export interface CapabilityConfig {
  */
 export const contentTypeConfigs: Record<string, ContentTypeConfig> = {
   'Blog Post': {
-    model: DEFAULT_MODEL,
+    model: AIModel.GPT4TurboSpecific,
     temperature: 0.7,
     maxTokens: 2000,
   },
   'LinkedIn Post': {
-    model: DEFAULT_MODEL,
+    model: AIModel.GPT4TurboSpecific,
     temperature: 0.6,
     maxTokens: 600,
   },
   'Twitter Post': {
-    model: DEFAULT_MODEL,
+    model: AIModel.GPT4TurboSpecific,
     temperature: 0.7,
     maxTokens: 280,
   },
   'Email': {
-    model: DEFAULT_MODEL,
+    model: AIModel.GPT4TurboSpecific,
     temperature: 0.5,
     maxTokens: 1000,
   },
   'Product Description': {
-    model: DEFAULT_MODEL,
+    model: AIModel.GPT4TurboSpecific,
     temperature: 0.6,
     maxTokens: 800,
   },
   'Outline': {
-    model: DEFAULT_MODEL,
+    model: AIModel.GPT4TurboSpecific,
     temperature: 0.7,
     maxTokens: 1000,
   },
@@ -78,19 +79,19 @@ export const contentTypeConfigs: Record<string, ContentTypeConfig> = {
  */
 export const capabilityConfigs: Record<string, CapabilityConfig> = {
   'Blog Writer': {
-    model: DEFAULT_MODEL,
+    model: AIModel.GPT4TurboSpecific,
     temperature: 0.7,
   },
   'Storyteller': {
-    model: DEFAULT_MODEL,
+    model: AIModel.GPT4TurboSpecific,
     temperature: 0.8,
   },
   'SEO Optimizer': {
-    model: DEFAULT_MODEL,
+    model: AIModel.GPT4TurboSpecific,
     temperature: 0.4,
   },
   'Outline Generator': {
-    model: DEFAULT_MODEL,
+    model: AIModel.GPT4TurboSpecific,
     temperature: 0.6,
   },
 };
@@ -106,7 +107,7 @@ export function getContentTypeConfig(contentType: string): ContentTypeConfig {
   
   // Return from default configs or fallback
   return contentTypeConfigs[contentType] || {
-    model: DEFAULT_MODEL,
+    model: AIModel.GPT4TurboSpecific,
     temperature: 0.7,
     maxTokens: 1000,
   };
@@ -123,7 +124,7 @@ export function getCapabilityConfig(capability: string): CapabilityConfig {
   
   // Return from default configs or fallback
   return capabilityConfigs[capability] || {
-    model: DEFAULT_MODEL,
+    model: AIModel.GPT4TurboSpecific,
     temperature: 0.7,
   };
 }

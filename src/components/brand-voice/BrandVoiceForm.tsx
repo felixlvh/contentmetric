@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { XCircle, Trash2, ArrowLeft } from 'lucide-react';
 import { Tab } from '@headlessui/react';
@@ -10,29 +10,14 @@ import { BrandVoice } from '@/types/brand-voice';
 type FormStep = 'content' | 'generating' | 'review';
 
 type ExampleContent = {
-  id: string;
-  type: 'blog' | 'social' | 'email' | 'website' | 'ad' | 'documentation';
-  content: string;
-  metadata: {
-    content_type: string;
-    target_audience?: string;
-    performance_metrics?: {
-      engagement_rate?: number;
-      conversion_rate?: number;
-      feedback_score?: number;
-    };
-    context?: {
-      platform?: string;
-      campaign?: string;
-      objective?: string;
-    };
-    analysis?: {
-      tone_score: number;
-      style_match: number;
-      vocabulary_fit: number;
-    };
+  text: string;
+  type: string;
+  analysis?: {
+    tone_match: number;
+    style_match: number;
+    personality_match: number;
+    suggestions: string[];
   };
-  created_at: string;
 };
 
 interface BrandVoiceFormProps {
@@ -79,20 +64,6 @@ export default function BrandVoiceForm({ brandVoice, onSubmit, onCancel, isEdit 
     user_id: brandVoice?.user_id || '',
   });
 
-  // Form field handlers
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, checked } = e.target;
-    setFormData(prev => ({ ...prev, [name]: checked }));
-  };
-
   // Function to handle step navigation
   const handleNextStep = () => {
     switch (currentStep) {
@@ -134,7 +105,7 @@ export default function BrandVoiceForm({ brandVoice, onSubmit, onCancel, isEdit 
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          content: formData.example_content?.[0]?.content
+          content: formData.example_content?.[0]?.text
         }),
       });
 
@@ -154,19 +125,20 @@ export default function BrandVoiceForm({ brandVoice, onSubmit, onCancel, isEdit 
         tone: analysis.tone,
         style: analysis.style,
         personality: analysis.personality,
-        brand_values: analysis.brand_values,
-        industry_terms: analysis.industry_terms,
-        communication_goals: analysis.communication_goals,
+        brand_values: analysis.brand_values || [],
+        industry_terms: analysis.industry_terms || [],
+        communication_goals: analysis.communication_goals || [],
         audience: {
-          primary: analysis.audience.primary,
-          pain_points: analysis.audience.pain_points,
-          goals: analysis.audience.goals
+          primary_demographics: analysis.audience?.primary || [],
+          secondary_demographics: [],
+          pain_points: analysis.audience?.pain_points || [],
+          goals: analysis.audience?.goals || []
         },
         avoid: {
-          terms: analysis.avoid.terms,
-          phrases: analysis.avoid.phrases,
-          topics: analysis.avoid.topics,
-          style_elements: analysis.avoid.style_elements
+          terms: analysis.avoid?.terms || [],
+          phrases: analysis.avoid?.phrases || [],
+          topics: analysis.avoid?.topics || [],
+          style_elements: analysis.avoid?.style_elements || []
         }
       }));
       
@@ -188,7 +160,7 @@ export default function BrandVoiceForm({ brandVoice, onSubmit, onCancel, isEdit 
     }
     
     const hasValidContent = formData.example_content.some(content => 
-      content.content.length >= 1000
+      content.text.length >= 1000
     );
 
     if (!hasValidContent) {
@@ -209,10 +181,10 @@ export default function BrandVoiceForm({ brandVoice, onSubmit, onCancel, isEdit 
     try {
       const payload = {
         ...formData,
-        // Remove any null or undefined values
-        tone: formData.tone?.filter(Boolean) || [],
-        style: formData.style?.filter(Boolean) || [],
-        personality: formData.personality?.filter(Boolean) || [],
+        // Handle string or array types properly
+        tone: Array.isArray(formData.tone) ? formData.tone.filter(Boolean) : formData.tone ? [formData.tone] : [],
+        style: Array.isArray(formData.style) ? formData.style.filter(Boolean) : formData.style ? [formData.style] : [],
+        personality: Array.isArray(formData.personality) ? formData.personality.filter(Boolean) : formData.personality ? [formData.personality] : [],
       };
 
       const url = isEdit ? `/api/brand-voice/${brandVoice?.id}` : '/api/brand-voice';
@@ -246,18 +218,14 @@ export default function BrandVoiceForm({ brandVoice, onSubmit, onCancel, isEdit 
     if (characterCount < 1000) return;
 
     const newContent: ExampleContent = {
-      id: crypto.randomUUID(),
+      text: textContent,
       type: 'blog',
-      content: textContent,
-      metadata: {
-        content_type: 'blog',
-        analysis: {
-          tone_score: 0,
-          style_match: 0,
-          vocabulary_fit: 0
-        }
-      },
-      created_at: new Date().toISOString(),
+      analysis: {
+        tone_match: 0,
+        style_match: 0,
+        personality_match: 0,
+        suggestions: []
+      }
     };
 
     setFormData(prev => ({
@@ -390,14 +358,14 @@ export default function BrandVoiceForm({ brandVoice, onSubmit, onCancel, isEdit 
           {formData.example_content?.length ? (
             <div className="space-y-2">
               {formData.example_content.map((content) => (
-                <div key={content.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-sm">{content.content.substring(0, 50)}...</span>
+                <div key={content.text} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm">{content.text.substring(0, 50)}...</span>
                   <button
                     type="button"
                     onClick={() => {
                       setFormData(prev => ({
                         ...prev,
-                        example_content: prev.example_content?.filter(c => c.id !== content.id) || []
+                        example_content: prev.example_content?.filter(c => c.text !== content.text) || []
                       }));
                     }}
                     className="text-gray-500 hover:text-red-500"
@@ -460,8 +428,15 @@ export default function BrandVoiceForm({ brandVoice, onSubmit, onCancel, isEdit 
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
               <p><span className="font-medium">Formality:</span> {formData.formality_level}</p>
               <p><span className="font-medium">Technical Level:</span> {formData.technical_level}</p>
-              <p><span className="font-medium">Tone:</span> {formData.tone?.join(', ')}</p>
-              <p><span className="font-medium">Style:</span> {formData.style?.join(', ')}</p>
+              <p><span className="font-medium">Tone:</span> {
+                Array.isArray(formData.tone) ? formData.tone.join(', ') : formData.tone || ''
+              }</p>
+              <p><span className="font-medium">Style:</span> {
+                Array.isArray(formData.style) ? formData.style.join(', ') : formData.style || ''
+              }</p>
+              <p><span className="font-medium">Personality:</span> {
+                Array.isArray(formData.personality) ? formData.personality.join(', ') : formData.personality || ''
+              }</p>
             </div>
           </div>
 
@@ -478,9 +453,30 @@ export default function BrandVoiceForm({ brandVoice, onSubmit, onCancel, isEdit 
           <div>
             <h4 className="font-medium text-gray-900 mb-2">Target Audience</h4>
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-              <p><span className="font-medium">Primary:</span> {formData.audience?.primary}</p>
-              <p><span className="font-medium">Pain Points:</span> {formData.audience?.pain_points?.join(', ')}</p>
-              <p><span className="font-medium">Goals:</span> {formData.audience?.goals?.join(', ')}</p>
+              <p><span className="font-medium">Primary:</span> {
+                typeof formData.audience === 'string' 
+                  ? formData.audience 
+                  : formData.audience?.primary_demographics
+                    ? Array.isArray(formData.audience.primary_demographics)
+                      ? formData.audience.primary_demographics.join(', ')
+                      : formData.audience.primary_demographics
+                    : ''
+              }</p>
+              <p><span className="font-medium">Secondary:</span> {
+                typeof formData.audience === 'string'
+                  ? ''
+                  : formData.audience?.secondary_demographics
+                    ? Array.isArray(formData.audience.secondary_demographics)
+                      ? formData.audience.secondary_demographics.join(', ')
+                      : formData.audience.secondary_demographics
+                    : ''
+              }</p>
+              <p><span className="font-medium">Pain Points:</span> {
+                typeof formData.audience === 'string' ? '' : formData.audience?.pain_points?.join(', ') || ''
+              }</p>
+              <p><span className="font-medium">Goals:</span> {
+                typeof formData.audience === 'string' ? '' : formData.audience?.goals?.join(', ') || ''
+              }</p>
             </div>
           </div>
 

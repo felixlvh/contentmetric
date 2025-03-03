@@ -18,6 +18,15 @@ const authRoutes = [
   '/auth/signup',
 ]
 
+// Define public routes that should never redirect
+const publicRoutes = [
+  '/api/health',
+  '/_next',
+  '/static',
+  '/images',
+  '/favicon.ico',
+]
+
 const getSupabaseUrl = () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!url) {
@@ -38,6 +47,14 @@ const getSupabaseAnonKey = () => {
 
 export async function middleware(request: NextRequest) {
   try {
+    // Get the current path from the request URL
+    const path = request.nextUrl.pathname
+
+    // Skip middleware for public routes
+    if (publicRoutes.some(route => path.startsWith(route))) {
+      return NextResponse.next();
+    }
+
     const response = NextResponse.next({
       request: {
         headers: request.headers,
@@ -64,6 +81,7 @@ export async function middleware(request: NextRequest) {
               if (process.env.NODE_ENV === 'production') {
                 options.secure = true;
                 options.sameSite = 'lax';
+                options.domain = request.headers.get('host')?.split(':')[0];
               }
               
               response.cookies.set({
@@ -81,6 +99,7 @@ export async function middleware(request: NextRequest) {
               if (process.env.NODE_ENV === 'production') {
                 options.secure = true;
                 options.sameSite = 'lax';
+                options.domain = request.headers.get('host')?.split(':')[0];
               }
               
               response.cookies.set({
@@ -96,29 +115,38 @@ export async function middleware(request: NextRequest) {
         },
       }
     )
-
-    // Get the current path from the request URL
-    const path = request.nextUrl.pathname
     
     // Check if the user is authenticated
     const { data: { user }, error } = await supabase.auth.getUser()
     if (error) {
       console.error('Error getting user in middleware:', error)
+      // Don't throw the error, just consider the user as not authenticated
     }
     
     const isAuthenticated = !!user
+
+    // Prevent redirect loops
+    const isRedirectLoop = request.headers.get('x-middleware-redirect') === 'true'
+    if (isRedirectLoop) {
+      console.warn('Detected redirect loop, allowing request to continue')
+      return response
+    }
     
     // Handle protected routes - redirect to login if not authenticated
     if (protectedRoutes.some(route => path.startsWith(route)) && !isAuthenticated) {
       const redirectUrl = new URL('/auth/login', request.url)
       redirectUrl.searchParams.set('message', 'Please log in to access this page')
       redirectUrl.searchParams.set('redirect', path)
-      return NextResponse.redirect(redirectUrl)
+      const redirectResponse = NextResponse.redirect(redirectUrl)
+      redirectResponse.headers.set('x-middleware-redirect', 'true')
+      return redirectResponse
     }
     
     // Handle auth routes - redirect to dashboard if already authenticated
     if (authRoutes.some(route => path.startsWith(route)) && isAuthenticated) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+      const redirectResponse = NextResponse.redirect(new URL('/dashboard', request.url))
+      redirectResponse.headers.set('x-middleware-redirect', 'true')
+      return redirectResponse
     }
     
     return response

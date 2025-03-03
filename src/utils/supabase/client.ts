@@ -22,10 +22,77 @@ export function createClient() {
   try {
     return createBrowserClient(
       getSupabaseUrl(),
-      getSupabaseAnonKey()
-    );
+      getSupabaseAnonKey(),
+      {
+        cookies: {
+          get(name) {
+            return document.cookie.split('; ').find(row => row.startsWith(`${name}=`))?.split('=')[1]
+          },
+          set(name, value, options) {
+            let cookie = `${name}=${value}`
+            if (options.maxAge) {
+              cookie += `; Max-Age=${options.maxAge}`
+            }
+            if (options.path) {
+              cookie += `; Path=${options.path}`
+            }
+            if (process.env.NODE_ENV === 'production') {
+              cookie += '; Secure; SameSite=Lax'
+              if (options.domain) {
+                cookie += `; Domain=${options.domain}`
+              }
+            }
+            document.cookie = cookie
+          },
+          remove(name, options) {
+            let cookie = `${name}=; Max-Age=0`
+            if (options.path) {
+              cookie += `; Path=${options.path}`
+            }
+            if (process.env.NODE_ENV === 'production') {
+              cookie += '; Secure; SameSite=Lax'
+              if (options.domain) {
+                cookie += `; Domain=${options.domain}`
+              }
+            }
+            document.cookie = cookie
+          },
+        },
+        auth: {
+          detectSessionInUrl: true,
+          flowType: 'pkce',
+          autoRefreshToken: true,
+          persistSession: true,
+          storage: {
+            getItem: (key) => {
+              try {
+                const item = localStorage.getItem(key)
+                return item
+              } catch (error) {
+                console.error('Error reading from localStorage:', error)
+                return null
+              }
+            },
+            setItem: (key, value) => {
+              try {
+                localStorage.setItem(key, value)
+              } catch (error) {
+                console.error('Error writing to localStorage:', error)
+              }
+            },
+            removeItem: (key) => {
+              try {
+                localStorage.removeItem(key)
+              } catch (error) {
+                console.error('Error removing from localStorage:', error)
+              }
+            },
+          },
+        },
+      }
+    )
   } catch (error) {
-    console.error('Error creating Supabase client:', error);
-    throw error;
+    console.error('Error creating Supabase client:', error)
+    throw error
   }
 } 

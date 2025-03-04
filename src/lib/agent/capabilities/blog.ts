@@ -3,6 +3,7 @@ import { AgentCapability } from '../core/types';
 import { callOpenAI } from '../models/openai';
 import { getBlogPrompt, getStorytellerBloggerPrompt } from '../prompts/templates';
 import { getCapabilityConfig } from '../core/config';
+import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
 
 // Import the ToneType from templates
 import { ToneType } from '../prompts/templates';
@@ -16,6 +17,18 @@ interface BlogContext {
   temperature?: number; // Temperature parameter
   [key: string]: unknown;
 }
+
+// Define the response types
+type NonStreamingResponse = {
+  content: string;
+  usage?: {
+    total_tokens: number;
+    completion_tokens: number;
+    prompt_tokens: number;
+  };
+};
+
+type StreamingResponse = AsyncIterable<ChatCompletionChunk>;
 
 export function getBlogCapability(): AgentCapability {
   return {
@@ -56,10 +69,20 @@ export function getBlogCapability(): AgentCapability {
         max_tokens: context?.wordCount ? Math.min(4000, context.wordCount * 1.5) : undefined,
         model: context?.model || config.model,
       });
+
+      // Type guard function to check if response is streaming
+      function isStreamingResponse(resp: StreamingResponse | NonStreamingResponse): resp is StreamingResponse {
+        return Symbol.asyncIterator in Object(resp);
+      }
+
+      // Handle both streaming and non-streaming responses
+      const content = isStreamingResponse(response)
+        ? '' // For streaming, content will be handled by the caller
+        : response.content;
       
       // Return the generated content
       return {
-        content: response.content,
+        content,
         actions: ['edit', 'expand', 'simplify'],
       };
     }

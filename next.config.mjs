@@ -13,8 +13,28 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   
-  // Configure webpack if needed
-  webpack(config) {
+  // Configure webpack with error handling
+  webpack(config, { dev, isServer }) {
+    // Add error handling through webpack
+    if (!dev && !isServer) {
+      config.optimization = {
+        ...config.optimization,
+        minimize: true,
+      };
+    }
+
+    // Log environment variable status during build
+    const requiredEnvVars = [
+      'NEXT_PUBLIC_SUPABASE_URL',
+      'NEXT_PUBLIC_SUPABASE_ANON_KEY'
+    ];
+
+    requiredEnvVars.forEach(envVar => {
+      if (!process.env[envVar]) {
+        console.warn(`Warning: ${envVar} is not set. This may cause issues in production.`);
+      }
+    });
+
     return config;
   },
 
@@ -26,14 +46,6 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  },
-
-  // Add error handling for missing environment variables
-  onError: (err) => {
-    console.error('Next.js build error:', err);
-    if (err.code === 'ENOTFOUND') {
-      console.error('Environment variables may be missing. Please check your Railway configuration.');
-    }
   },
 };
 

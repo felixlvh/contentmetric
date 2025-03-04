@@ -4,13 +4,34 @@ import { callOpenAI } from '../models/openai';
 import { getBlogCapability } from '../capabilities/blog';
 import { getSocialMediaCapability } from '../capabilities/socialMedia';
 import { getImproveCapability } from '../capabilities/improve';
+import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
+
+// Define the response types
+type NonStreamingResponse = {
+  content: string;
+  usage?: {
+    total_tokens: number;
+    completion_tokens: number;
+    prompt_tokens: number;
+  };
+};
+
+type StreamingResponse = AsyncIterable<ChatCompletionChunk>;
+
+// Type guard function to check if response is streaming
+function isStreamingResponse(resp: StreamingResponse | NonStreamingResponse): resp is StreamingResponse {
+  return Symbol.asyncIterator in Object(resp);
+}
+
+// Helper function to get content from response
+function getResponseContent(response: StreamingResponse | NonStreamingResponse): string {
+  return isStreamingResponse(response) ? '' : response.content;
+}
 
 export async function processAgentRequest({
   prompt,
-  documentId,
   context,
-  userId,
-}: AgentRequestParams): Promise<AgentResponse> {
+}: Pick<AgentRequestParams, 'prompt' | 'context'>): Promise<AgentResponse> {
   // 1. Determine the user's intent
   const intent = await determineIntent(prompt);
   
@@ -59,11 +80,11 @@ async function determineIntent(prompt: string): Promise<string> {
     max_tokens: 50,
   });
   
-  const intent = response.content.trim().toLowerCase();
+  const content = getResponseContent(response);
   
-  if (intent.includes('write_blog')) return 'write_blog';
-  if (intent.includes('write_social')) return 'write_social';
-  if (intent.includes('improve')) return 'improve_content';
+  if (content.includes('write_blog')) return 'write_blog';
+  if (content.includes('write_social')) return 'write_social';
+  if (content.includes('improve')) return 'improve_content';
   return 'general_question';
 }
 
@@ -80,7 +101,7 @@ async function provideGeneralAssistance(prompt: string) {
   });
   
   return {
-    content: response.content,
+    content: getResponseContent(response),
     actions: [],
   };
 }
@@ -96,8 +117,10 @@ async function generateSuggestions(intent: string, content: string): Promise<str
     max_tokens: 150,
   });
   
+  const responseContent = getResponseContent(response);
+  
   // Parse the numbered list from the response
-  const suggestions = response.content
+  const suggestions = responseContent
     .split('\n')
     .filter(line => line.trim().match(/^\d+\.|\-/))
     .map(line => line.replace(/^\d+\.|\-\s*/, '').trim())

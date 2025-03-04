@@ -1,13 +1,34 @@
 // src/lib/agent/capabilities/improve.ts
 import { AgentCapability } from '../core/types';
 import { callOpenAI } from '../models/openai';
+import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
+
+// Define the response types
+type NonStreamingResponse = {
+  content: string;
+  usage?: {
+    total_tokens: number;
+    completion_tokens: number;
+    prompt_tokens: number;
+  };
+};
+
+type StreamingResponse = AsyncIterable<ChatCompletionChunk>;
+
+// Define the improve context type
+interface ImproveContext {
+  content?: string;
+  temperature?: number;
+  model?: string;
+  [key: string]: unknown;
+}
 
 export function getImproveCapability(): AgentCapability {
   return {
     name: 'Content Improver',
     description: 'Enhances existing content based on user requests',
     
-    execute: async (prompt: string, context?: any) => {
+    execute: async (prompt: string, context?: ImproveContext) => {
       // Extract the content to improve from context
       const contentToImprove = context?.content || '';
       
@@ -29,11 +50,22 @@ export function getImproveCapability(): AgentCapability {
           { role: 'system', content: systemPrompt },
           { role: 'user', content: contentToImprove }
         ],
-        temperature: 0.6,
+        temperature: context?.temperature ?? 0.6,
+        model: context?.model,
       });
+
+      // Type guard function to check if response is streaming
+      function isStreamingResponse(resp: StreamingResponse | NonStreamingResponse): resp is StreamingResponse {
+        return Symbol.asyncIterator in Object(resp);
+      }
+
+      // Handle both streaming and non-streaming responses
+      const content = isStreamingResponse(response)
+        ? '' // For streaming, content will be handled by the caller
+        : response.content;
       
       return {
-        content: response.content,
+        content,
         actions: ['compare', 'undo', 'enhance_further'],
       };
     }

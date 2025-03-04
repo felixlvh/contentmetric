@@ -21,6 +21,7 @@ type OpenAICallParams = {
   temperature?: number;
   max_tokens?: number;
   model?: string;
+  stream?: boolean;
 };
 
 export async function callOpenAI({
@@ -28,6 +29,7 @@ export async function callOpenAI({
   temperature = 0.7,
   max_tokens,
   model = DEFAULT_MODEL,
+  stream = false,
 }: OpenAICallParams) {
   try {
     console.log(`Attempting to call OpenAI with model: ${model}`);
@@ -37,11 +39,17 @@ export async function callOpenAI({
       messages,
       temperature,
       max_tokens,
+      stream,
     });
 
+    if (stream) {
+      return response as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
+    }
+
+    const completionResponse = response as OpenAI.Chat.Completions.ChatCompletion;
     return {
-      content: response.choices[0].message.content || '',
-      usage: response.usage,
+      content: completionResponse.choices[0].message.content || '',
+      usage: completionResponse.usage,
     };
   } catch (error: unknown) {
     console.error('OpenAI API error:', error);
@@ -80,5 +88,19 @@ export async function callOpenAI({
     // For other types of errors, throw with the original message
     const errorMessage = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to generate content from OpenAI: ${errorMessage}`);
+  }
+}
+
+export async function* streamOpenAIResponse(response: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
+  try {
+    for await (const chunk of response) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      if (content) {
+        yield content;
+      }
+    }
+  } catch (error) {
+    console.error('Error streaming response:', error);
+    throw error;
   }
 } 

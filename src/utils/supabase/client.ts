@@ -26,9 +26,11 @@ export function createClient() {
       {
         cookies: {
           get(name) {
+            if (typeof document === 'undefined') return undefined
             return document.cookie.split('; ').find(row => row.startsWith(`${name}=`))?.split('=')[1]
           },
           set(name, value, options) {
+            if (typeof document === 'undefined') return
             let cookie = `${name}=${value}`
             if (options.maxAge) {
               cookie += `; Max-Age=${options.maxAge}`
@@ -45,6 +47,7 @@ export function createClient() {
             document.cookie = cookie
           },
           remove(name, options) {
+            if (typeof document === 'undefined') return
             let cookie = `${name}=; Max-Age=0`
             if (options.path) {
               cookie += `; Path=${options.path}`

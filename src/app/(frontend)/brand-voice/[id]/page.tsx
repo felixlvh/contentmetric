@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { BrandVoice } from '@/types/brand-voice';
 import Link from 'next/link';
+import ReactMarkdown from 'react-markdown';
 
 interface Excerpt {
   id: string;
@@ -41,8 +42,8 @@ export default function BrandVoiceDetailsPage() {
   const [previewTopic, setPreviewTopic] = useState('');
   const [previewOutline, setPreviewOutline] = useState('');
   const [showContentTypeDropdown, setShowContentTypeDropdown] = useState(false);
-  const [isTopicExpanded, setIsTopicExpanded] = useState(true);
-  const [isOutlineExpanded, setIsOutlineExpanded] = useState(true);
+  const [isTopicExpanded, setIsTopicExpanded] = useState(false);
+  const [isOutlineExpanded, setIsOutlineExpanded] = useState(false);
   const [isTopicFilled, setIsTopicFilled] = useState(false);
   const [isOutlineFilled, setIsOutlineFilled] = useState(false);
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
@@ -50,6 +51,8 @@ export default function BrandVoiceDetailsPage() {
   const [generatedContentWithBrandVoice, setGeneratedContentWithBrandVoice] = useState<string | null>(null);
   const [generatedContentWithoutBrandVoice, setGeneratedContentWithoutBrandVoice] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [isLoadingWithBrandVoice, setIsLoadingWithBrandVoice] = useState(false);
+  const [isLoadingWithoutBrandVoice, setIsLoadingWithoutBrandVoice] = useState(false);
 
   useEffect(() => {
     if (params && params.id) {
@@ -221,15 +224,14 @@ export default function BrandVoiceDetailsPage() {
 
   // Generate outline based on topic
   const generateOutline = async () => {
-    if (!previewTopic.trim()) {
-      return; // Don't generate if no topic
+    if (!previewTopic.trim() || !params?.id || !brandVoice) {
+      return; // Don't generate if no topic, brand voice ID, or brand voice data
     }
     
     try {
-      // Set loading state
       setIsGeneratingOutline(true);
+      setGenerationError(null);
       
-      // Call the API endpoint instead of using the capability directly
       const response = await fetch('/api/outline', {
         method: 'POST',
         headers: {
@@ -237,25 +239,29 @@ export default function BrandVoiceDetailsPage() {
         },
         body: JSON.stringify({
           topic: previewTopic,
-          tone: 'professional',
+          brandVoiceId: params.id
         }),
       });
       
       if (!response.ok) {
-        throw new Error('Failed to generate outline');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to generate outline');
       }
       
       const data = await response.json();
       
-      // Update the outline with the generated content
+      if (!data.outline) {
+        throw new Error('No outline received from the server');
+      }
+      
       setPreviewOutline(data.outline);
+      setIsOutlineFilled(true);
+      
     } catch (error) {
       console.error('Error generating outline:', error);
-      // Fallback to a simple outline if the API call fails
-      const topicTitle = previewTopic.charAt(0).toUpperCase() + previewTopic.slice(1);
-      setPreviewOutline(`# ${topicTitle}: A Comprehensive Guide\n\n## Introduction\n- Key points about ${previewTopic}\n\n## Main Sections\n- Important aspect 1\n- Important aspect 2\n- Important aspect 3\n\n## Conclusion\n- Summary and next steps`);
+      setGenerationError(error instanceof Error ? error.message : 'Failed to generate outline');
+      setPreviewOutline(''); // Clear outline on error
     } finally {
-      // Clear loading state
       setIsGeneratingOutline(false);
     }
   };
@@ -277,7 +283,7 @@ export default function BrandVoiceDetailsPage() {
       "Benefits of Meditation",
       "How to Start a Blog",
       "Effective Time Management Tips",
-      "Digital Marketing Strategies for 2023",
+      "Digital Marketing Strategies for 2025",
       "Sustainable Living Practices",
       "Remote Work Best Practices",
       "Healthy Eating Habits",
@@ -299,157 +305,246 @@ export default function BrandVoiceDetailsPage() {
     setRandomTopics(getRandomTopics());
   }, []);
 
-  // Generate content with and without brand voice
-  const generateContent = async () => {
-    if (!previewTopic.trim() || !params?.id) {
-      return; // Don't generate if no topic or no brand voice ID
-    }
-    
-    // Reset any previous errors
-    setGenerationError(null);
-    
-    try {
-      // Set loading state
-      setIsGeneratingContent(true);
-      
-      // Check if we have the brand voice data first
-      if (!brandVoice) {
-        try {
-          // Try to fetch the brand voice again
-          await fetchBrandVoice(params.id as string);
-        } catch (fetchError) {
-          console.error('Error fetching brand voice:', fetchError);
-          throw new Error('Could not fetch brand voice details. Please try refreshing the page.');
-        }
-        
-        // If still no brand voice after fetching, throw error
-        if (!brandVoice) {
-          throw new Error('Brand voice details not available. Please try refreshing the page.');
-        }
-      }
-      
-      // Generate content WITH brand voice
-      const withBrandVoiceResponse = await fetch('/api/brand-voice-preview', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          brandVoiceId: params.id,
-          contentType: previewContentType,
-          topic: previewTopic,
-          outline: previewOutline,
-          withBrandVoice: true
-        }),
-      });
-      
-      let withBrandVoiceData;
-      
-      if (!withBrandVoiceResponse.ok) {
-        const errorData = await withBrandVoiceResponse.json().catch(() => ({ error: 'Unknown error' }));
-        
-        // If it's an authentication error, try to refresh the page
-        if (errorData.error && errorData.error.includes('Authentication')) {
-          throw new Error('Authentication error. Please try refreshing the page and logging in again.');
-        }
-        
-        throw new Error(errorData.error || 'Failed to generate content with brand voice');
-      }
-      
-      try {
-        withBrandVoiceData = await withBrandVoiceResponse.json();
-      } catch (parseError) {
-        console.error('Error parsing brand voice response:', parseError);
-        throw new Error('Failed to parse response from server');
-      }
-      
-      // Generate content WITHOUT brand voice
-      const withoutBrandVoiceResponse = await fetch('/api/brand-voice-preview', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          brandVoiceId: params.id,
-          contentType: previewContentType,
-          topic: previewTopic,
-          outline: previewOutline,
-          withBrandVoice: false
-        }),
-      });
-      
-      let withoutBrandVoiceData;
-      
-      if (!withoutBrandVoiceResponse.ok) {
-        const errorData = await withoutBrandVoiceResponse.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || 'Failed to generate content without brand voice');
-      }
-      
-      try {
-        withoutBrandVoiceData = await withoutBrandVoiceResponse.json();
-      } catch (parseError) {
-        console.error('Error parsing response without brand voice:', parseError);
-        throw new Error('Failed to parse response from server');
-      }
-      
-      // Update the state with generated content
-      setGeneratedContentWithBrandVoice(withBrandVoiceData.content);
-      setGeneratedContentWithoutBrandVoice(withoutBrandVoiceData.content);
-      
-    } catch (error) {
-      console.error('Error generating content:', error);
-      // Set error state or show error message
-      setGenerationError(error instanceof Error ? error.message : 'Failed to generate content');
-    } finally {
-      // Clear loading state
-      setIsGeneratingContent(false);
-    }
-  };
+  // Simplified content display component with smooth transitions
+  const ContentDisplay: React.FC<{ 
+    content: string | null;
+    className?: string;
+  }> = ({ content, className }) => {
+    const [displayContent, setDisplayContent] = useState(content);
+    const [isUpdating, setIsUpdating] = useState(false);
 
-  // Add this near where you render the preview modal content
-  const renderPreviewContent = () => {
-    if (isGeneratingContent) {
-      return (
-        <div className="flex items-center justify-center p-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      );
-    }
-    
-    if (generationError) {
-      return (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
-          <p className="font-medium">Generation Error</p>
-          <p>{generationError}</p>
-        </div>
-      );
-    }
-    
+    useEffect(() => {
+      if (content !== displayContent) {
+        setIsUpdating(true);
+        // Use a timeout to ensure the fade-out animation plays
+        const timeout = setTimeout(() => {
+          setDisplayContent(content);
+          setIsUpdating(false);
+        }, 150); // Match this with CSS transition duration
+        return () => clearTimeout(timeout);
+      }
+    }, [content]);
+
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="border rounded-lg p-4">
-          <h3 className="text-lg font-semibold mb-2">With Brand Voice</h3>
-          <div className="prose max-w-none">
-            {generatedContentWithBrandVoice ? (
-              <div dangerouslySetInnerHTML={{ __html: generatedContentWithBrandVoice }} />
-            ) : (
-              <p className="text-gray-500">No content generated yet</p>
-            )}
-          </div>
-        </div>
-        <div className="border rounded-lg p-4">
-          <h3 className="text-lg font-semibold mb-2">Without Brand Voice</h3>
-          <div className="prose max-w-none">
-            {generatedContentWithoutBrandVoice ? (
-              <div dangerouslySetInnerHTML={{ __html: generatedContentWithoutBrandVoice }} />
-            ) : (
-              <p className="text-gray-500">No content generated yet</p>
-            )}
-          </div>
-        </div>
+      <div 
+        className={`${className} transition-opacity duration-150 ease-in-out`}
+        style={{ opacity: isUpdating ? 0.5 : 1 }}
+      >
+        <ReactMarkdown
+          components={{
+            p: ({ children }) => (
+              <p className="mb-4 last:mb-0 transition-all duration-300 ease-in-out">{children}</p>
+            ),
+            h1: ({ children }) => (
+              <h1 className="text-2xl font-bold mb-4 mt-6 transition-all duration-300 ease-in-out">{children}</h1>
+            ),
+            h2: ({ children }) => (
+              <h2 className="text-xl font-bold mb-3 mt-5 transition-all duration-300 ease-in-out">{children}</h2>
+            ),
+            h3: ({ children }) => (
+              <h3 className="text-lg font-bold mb-2 mt-4 transition-all duration-300 ease-in-out">{children}</h3>
+            ),
+            ul: ({ children }) => (
+              <ul className="list-disc pl-4 mb-4 transition-all duration-300 ease-in-out">{children}</ul>
+            ),
+            ol: ({ children }) => (
+              <ol className="list-decimal pl-4 mb-4 transition-all duration-300 ease-in-out">{children}</ol>
+            ),
+            li: ({ children }) => (
+              <li className="mb-1 transition-all duration-300 ease-in-out">{children}</li>
+            ),
+            blockquote: ({ children }) => (
+              <blockquote className="border-l-4 border-gray-200 pl-4 italic my-4 transition-all duration-300 ease-in-out">
+                {children}
+              </blockquote>
+            ),
+          }}
+        >
+          {displayContent || ''}
+        </ReactMarkdown>
       </div>
     );
   };
+
+  // Improved streaming handler with batched updates
+  const handleStream = async (
+    response: Response,
+    updateContent: (content: string) => void,
+    setLoading: (loading: boolean) => void
+  ) => {
+    if (!response.body) return;
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = '';
+    let batchTimeout: NodeJS.Timeout | null = null;
+    let lastUpdateTime = Date.now();
+    const MIN_UPDATE_INTERVAL = 300; // Minimum time between updates in ms
+    const BATCH_SIZE = 100; // Characters to accumulate before updating
+
+    const processBatch = (force = false) => {
+      const currentTime = Date.now();
+      const timeSinceLastUpdate = currentTime - lastUpdateTime;
+      
+      if (force || (fullContent.length >= BATCH_SIZE && timeSinceLastUpdate >= MIN_UPDATE_INTERVAL)) {
+        const formattedContent = formatContent(fullContent);
+        updateContent(formattedContent);
+        lastUpdateTime = currentTime;
+      }
+    };
+
+    try {
+      setLoading(false);
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(5);
+            if (data === '[DONE]') break;
+
+            fullContent += data;
+
+            // Clear any pending batch update
+            if (batchTimeout) {
+              clearTimeout(batchTimeout);
+            }
+
+            // Schedule a new batch update
+            batchTimeout = setTimeout(() => {
+              processBatch();
+            }, MIN_UPDATE_INTERVAL);
+
+            // Process immediately if we have accumulated enough content
+            processBatch();
+          }
+        }
+      }
+
+      // Final update
+      if (batchTimeout) {
+        clearTimeout(batchTimeout);
+      }
+      const finalContent = formatContent(fullContent);
+      updateContent(finalContent);
+
+    } finally {
+      reader.releaseLock();
+      setLoading(false);
+    }
+  };
+
+  // Improved content formatting with better whitespace handling
+  const formatContent = (content: string): string => {
+    if (!content) return '';
+
+    // First pass: Basic cleanup
+    let formatted = content
+      .replace(/\s+/g, ' ')
+      .replace(/\n\s*\n/g, '\n\n')
+      .trim();
+
+    // Second pass: Markdown formatting
+    formatted = formatted
+      // Headers: ensure proper spacing and newlines
+      .replace(/#{1,6}\s+/g, match => `\n\n${match}`)
+      // Lists: ensure proper indentation and spacing
+      .replace(/^[-*]\s+/gm, '\n- ')
+      .replace(/^\d+\.\s+/gm, match => `\n${match}`)
+      // Emphasis: clean up spacing around markdown syntax
+      .replace(/\*\*([^*]+)\*\*/g, match => ` ${match.trim()} `)
+      .replace(/\*([^*]+)\*/g, match => ` ${match.trim()} `)
+      .replace(/`([^`]+)`/g, match => ` ${match.trim()} `)
+      // Blockquotes: ensure proper formatting
+      .replace(/^>\s+/gm, '\n> ')
+      // Clean up excessive newlines
+      .replace(/\n{3,}/g, '\n\n')
+      // Final cleanup
+      .trim();
+
+    return formatted;
+  };
+
+  // Generate content with and without brand voice
+  async function generateContent() {
+    if (!previewTopic || !params?.id) return;
+
+    try {
+      setGenerationError(null);
+      setIsGeneratingContent(true);
+      setIsLoadingWithBrandVoice(true);
+      setIsLoadingWithoutBrandVoice(true);
+      setGeneratedContentWithBrandVoice(null);
+      setGeneratedContentWithoutBrandVoice(null);
+
+      const brandVoiceId = params.id;
+
+      // Generate content with brand voice (streaming)
+      const withBrandVoiceResponse = await fetch('/api/brand-voice-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brandVoiceId,
+          contentType: previewContentType,
+          topic: previewTopic,
+          outline: previewOutline,
+          withBrandVoice: true,
+          stream: true,
+        }),
+      });
+
+      if (!withBrandVoiceResponse.ok) {
+        const error = await withBrandVoiceResponse.json();
+        throw new Error(error.error || 'Failed to generate content');
+      }
+
+      // Generate content without brand voice (streaming)
+      const withoutBrandVoiceResponse = await fetch('/api/brand-voice-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          brandVoiceId,
+          contentType: previewContentType,
+          topic: previewTopic,
+          outline: previewOutline,
+          withBrandVoice: false,
+          stream: true,
+        }),
+      });
+
+      if (!withoutBrandVoiceResponse.ok) {
+        const error = await withoutBrandVoiceResponse.json();
+        throw new Error(error.error || 'Failed to generate content');
+      }
+
+      // Handle both streams concurrently
+      await Promise.all([
+        handleStream(
+          withBrandVoiceResponse,
+          setGeneratedContentWithBrandVoice,
+          setIsLoadingWithBrandVoice
+        ),
+        handleStream(
+          withoutBrandVoiceResponse,
+          setGeneratedContentWithoutBrandVoice,
+          setIsLoadingWithoutBrandVoice
+        ),
+      ]);
+
+    } catch (error) {
+      console.error('Error generating content:', error);
+      setGenerationError(error instanceof Error ? error.message : 'Failed to generate content');
+    } finally {
+      setIsGeneratingContent(false);
+      setIsLoadingWithBrandVoice(false);
+      setIsLoadingWithoutBrandVoice(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -722,9 +817,9 @@ export default function BrandVoiceDetailsPage() {
       {/* Preview Brand Voice Modal */}
       {isPreviewModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-[80%] h-[80%] max-h-[80vh] overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center p-4 border-b">
-              <h2 className="text-xl font-semibold">Preview Brand Voice</h2>
+          <div className="overflow-hidden rounded-lg bg-white shadow-xl w-[90%] h-[90%] max-h-[90vh] flex flex-col">
+            <div className="bg-gray-50 px-4 py-3 sm:px-6 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-gray-900">Preview Brand Voice</h2>
               <button 
                 onClick={closePreviewModal}
                 className="text-gray-500 hover:text-gray-700"
@@ -733,226 +828,301 @@ export default function BrandVoiceDetailsPage() {
               </button>
             </div>
             
-            <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-auto flex-grow text-sm">
-              {/* Left column - Input options */}
-              <div className="lg:col-span-1 flex flex-col h-full">
-                <h3 className="text-base font-medium mb-4">How would you like to test your Brand Voice?</h3>
-                
-                <div className="space-y-4 flex-grow overflow-auto">
-                  {/* Content Type Dropdown */}
-                  <div>
-                    <div className="relative">
+            <div className="flex-1 overflow-auto">
+              <div className="p-6 grid grid-cols-3 gap-6">
+                {/* Input options */}
+                <div className="bg-white">
+                  <h3 className="text-base font-medium mb-4 text-gray-900">How would you like to test your Brand Voice?</h3>
+                  
+                  <div className="space-y-4">
+                    {/* Content Type Dropdown */}
+                    <div>
+                      <div className="relative">
+                        <button 
+                          className="w-full flex justify-between items-center px-3 py-2 border border-gray-300 rounded-md text-left"
+                          onClick={toggleContentTypeDropdown}
+                        >
+                          <span>{previewContentType}</span>
+                          <ChevronDown className="h-4 w-4" />
+                        </button>
+                        
+                        {showContentTypeDropdown && (
+                          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+                            <button 
+                              className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${previewContentType === 'Blog Post' ? 'bg-gray-50 font-medium' : ''}`}
+                              onClick={() => selectContentType('Blog Post')}
+                            >
+                              Blog Post
+                            </button>
+                            <button 
+                              className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${previewContentType === 'LinkedIn Post' ? 'bg-gray-50 font-medium' : ''}`}
+                              onClick={() => selectContentType('LinkedIn Post')}
+                            >
+                              LinkedIn Post
+                            </button>
+                            <button 
+                              className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${previewContentType === 'Product Description' ? 'bg-gray-50 font-medium' : ''}`}
+                              onClick={() => selectContentType('Product Description')}
+                            >
+                              Product Description
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Topic Input with Dropdown */}
+                    <div className="border border-gray-200 rounded-md overflow-hidden">
                       <button 
-                        className="w-full flex justify-between items-center px-3 py-2 border border-gray-300 rounded-md text-left"
-                        onClick={toggleContentTypeDropdown}
+                        onClick={toggleTopicSection}
+                        className="w-full flex justify-between items-center px-3 py-2 bg-gray-50 text-left"
                       >
-                        <span>{previewContentType}</span>
-                        <ChevronDown className="h-4 w-4" />
+                        <div className="flex items-center">
+                          <div className="mr-2">
+                            {isTopicFilled ? (
+                              <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-green-500 border-dashed bg-green-100"></div>
+                            ) : (
+                              <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-dashed border-gray-600"></div>
+                            )}
+                          </div>
+                          <span className="font-medium">Topic</span>
+                          {previewTopic && (
+                            <span className="ml-2 text-gray-500 truncate max-w-[150px]">
+                              {previewTopic}
+                            </span>
+                          )}
+                        </div>
+                        {isTopicExpanded ? (
+                          <ChevronUp className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-gray-500" />
+                        )}
                       </button>
                       
-                      {showContentTypeDropdown && (
-                        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
-                          <button 
-                            className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${previewContentType === 'Blog Post' ? 'bg-gray-50 font-medium' : ''}`}
-                            onClick={() => selectContentType('Blog Post')}
-                          >
-                            Blog Post
-                          </button>
-                          <button 
-                            className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${previewContentType === 'LinkedIn Post' ? 'bg-gray-50 font-medium' : ''}`}
-                            onClick={() => selectContentType('LinkedIn Post')}
-                          >
-                            LinkedIn Post
-                          </button>
-                          <button 
-                            className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${previewContentType === 'Product Description' ? 'bg-gray-50 font-medium' : ''}`}
-                            onClick={() => selectContentType('Product Description')}
-                          >
-                            Product Description
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Topic Input with Dropdown */}
-                  <div className="border border-gray-200 rounded-md overflow-hidden">
-                    <button 
-                      onClick={toggleTopicSection}
-                      className="w-full flex justify-between items-center px-3 py-2 bg-gray-50 text-left"
-                    >
-                      <div className="flex items-center">
-                        <div className="mr-2">
-                          {isTopicFilled ? (
-                            <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-green-500 border-dashed bg-green-100"></div>
-                          ) : (
-                            <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-dashed border-gray-600"></div>
-                          )}
-                        </div>
-                        <span className="font-medium">Topic</span>
-                        {previewTopic && (
-                          <span className="ml-2 text-gray-500 truncate max-w-[150px]">
-                            {previewTopic}
-                          </span>
-                        )}
-                      </div>
-                      {isTopicExpanded ? (
-                        <ChevronUp className="h-4 w-4 text-gray-500" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-gray-500" />
-                      )}
-                    </button>
-                    
-                    <div 
-                      className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                        isTopicExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
-                      }`}
-                    >
-                      <div className="p-3">
-                        <p className="text-xs text-gray-600 mb-2">What is the topic of your post?</p>
-                        <input
-                          type="text"
-                          value={previewTopic}
-                          onChange={(e) => setPreviewTopic(e.target.value)}
-                          placeholder="Enter a topic"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md mb-1 text-sm"
-                        />
-                        <div className="flex justify-end text-xs text-gray-500 mb-2">
-                          <span>{previewTopic.length} / 1000</span>
-                        </div>
-                        
-                        {/* Quick Picks Section - Always visible */}
-                        <div className="mb-4">
-                          <div className="space-y-2">
-                            <div className="flex items-center mb-2">
-                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-1">
-                                <path d="M13.3332 8.00004L7.33317 14.0001L5.6665 12.3334L9.99984 8.00004L5.6665 3.66671L7.33317 2.00004L13.3332 8.00004Z" fill="#6366F1"/>
-                                <path d="M10.6668 8.00004L4.6668 14.0001L3 12.3334L7.33333 8.00004L3 3.66671L4.6668 2.00004L10.6668 8.00004Z" fill="#6366F1" fillOpacity="0.3"/>
-                              </svg>
-                              <span className="text-xs text-gray-500">Quick picks</span>
+                      <div 
+                        className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                          isTopicExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+                        }`}
+                      >
+                        <div className="p-3">
+                          <p className="text-xs text-gray-600 mb-2">What is the topic of your post?</p>
+                          <input
+                            type="text"
+                            value={previewTopic}
+                            onChange={(e) => setPreviewTopic(e.target.value)}
+                            placeholder="Enter a topic"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md mb-1 text-sm"
+                          />
+                          <div className="flex justify-end text-xs text-gray-500 mb-2">
+                            <span>{previewTopic.length} / 1000</span>
+                          </div>
+                          
+                          {/* Quick Picks Section - Always visible */}
+                          <div className="mb-4">
+                            <div className="space-y-2">
+                              <div className="flex items-center mb-2">
+                                <Zap className="h-3.5 w-3.5 mr-1 text-indigo-600" />
+                                <span className="text-xs text-indigo-600">Quick picks</span>
+                              </div>
+                              {randomTopics.map((topic, index) => (
+                                <button 
+                                  key={index}
+                                  className="w-full text-left px-3 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-md text-xs"
+                                  onClick={() => setTopicAndSwitchToOutline(topic)}
+                                >
+                                  {topic}
+                                </button>
+                              ))}
                             </div>
-                            {randomTopics.map((topic, index) => (
-                              <button 
-                                key={index}
-                                className="w-full text-left px-3 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-md text-xs"
-                                onClick={() => setTopicAndSwitchToOutline(topic)}
-                              >
-                                {topic}
-                              </button>
-                            ))}
+                          </div>
+
+                          <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end">
+                            <button 
+                              onClick={() => {
+                                setIsTopicExpanded(false);
+                                setTimeout(() => {
+                                  setIsOutlineExpanded(true);
+                                }, 300);
+                              }}
+                              disabled={!previewTopic.trim()}
+                              className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Next
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Outline Input with Dropdown */}
+                    <div className="border border-gray-200 rounded-md overflow-hidden">
+                      <button 
+                        onClick={toggleOutlineSection}
+                        className="w-full flex justify-between items-center px-3 py-2 bg-gray-50 text-left"
+                      >
+                        <div className="flex items-center">
+                          <div className="mr-2">
+                            {isOutlineFilled ? (
+                              <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-green-500 border-dashed bg-green-100"></div>
+                            ) : (
+                              <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-dashed border-gray-600"></div>
+                            )}
+                          </div>
+                          <span className="font-medium">Outline</span>
+                        </div>
+                        {isOutlineExpanded ? (
+                          <ChevronUp className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-gray-500" />
+                        )}
+                      </button>
+                      
+                      <div 
+                        className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                          isOutlineExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+                        }`}
+                      >
+                        <div className="p-3">
+                          <p className="text-xs text-gray-600 mb-2">What is the outline of your post?</p>
+                          {/* Show loading indicator during outline generation */}
+                          {isGeneratingOutline ? (
+                            <div className="flex items-center justify-center py-4">
+                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500"></div>
+                              <span className="ml-2 text-sm text-gray-600">Generating outline...</span>
+                            </div>
+                          ) : (
+                            <textarea
+                              value={previewOutline}
+                              onChange={(e) => setPreviewOutline(e.target.value)}
+                              placeholder="Enter or generate an outline for your content..."
+                              className="w-full h-[300px] p-3 border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            />
+                          )}
+                          
+                          <div className="flex items-center mt-2">
+                            <button 
+                              onClick={generateOutline}
+                              className="flex items-center text-indigo-600 hover:text-indigo-800 text-xs"
+                              disabled={!previewTopic.trim()}
+                            >
+                              <Zap className="h-3.5 w-3.5 mr-1" />
+                              Generate response
+                            </button>
+                            <div className="whitespace-nowrap ml-auto mr-3">
+                              <span className="flex gap-1 items-center pl-3 text-caption whitespace-pre-line">
+                                <span data-testid="input-message" className="text-gray-600 text-xs">
+                                  {previewOutline.length} / 10000
+                                </span>
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end">
+                            <button 
+                              onClick={() => {
+                                setIsOutlineExpanded(false);
+                                // Wait for animation to complete before proceeding
+                                setTimeout(() => {
+                                  generatePreview();
+                                }, 300);
+                              }}
+                              className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
+                            >
+                              Next
+                            </button>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
                   
-                  {/* Outline Input with Dropdown */}
-                  <div className="border border-gray-200 rounded-md overflow-hidden">
+                  {/* Generate button */}
+                  <div className="mt-6">
                     <button 
-                      onClick={toggleOutlineSection}
-                      className="w-full flex justify-between items-center px-3 py-2 bg-gray-50 text-left"
+                      onClick={generateContent}
+                      className="w-full px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={isGeneratingContent || !previewTopic.trim()}
                     >
-                      <div className="flex items-center">
-                        <div className="mr-2">
-                          {isOutlineFilled ? (
-                            <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-green-500 border-dashed bg-green-100"></div>
-                          ) : (
-                            <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-dashed border-gray-600"></div>
-                          )}
-                        </div>
-                        <span className="font-medium">Outline</span>
-                      </div>
-                      {isOutlineExpanded ? (
-                        <ChevronUp className="h-4 w-4 text-gray-500" />
+                      {isGeneratingContent ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Generating...
+                        </>
                       ) : (
-                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                        <>
+                          <Zap className="h-4 w-4 mr-2" />
+                          Generate
+                        </>
                       )}
                     </button>
-                    
-                    <div 
-                      className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                        isOutlineExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
-                      }`}
-                    >
-                      <div className="p-3">
-                        <p className="text-xs text-gray-600 mb-2">What is the outline of your post?</p>
-                        {/* Show loading indicator during outline generation */}
-                        {isGeneratingOutline ? (
-                          <div className="flex items-center justify-center py-4">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500"></div>
-                            <span className="ml-2 text-sm text-gray-600">Generating outline...</span>
+                  </div>
+                </div>
+
+                {/* Preview content */}
+                {generationError ? (
+                  <div className="col-span-2 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+                    <p className="font-medium">Generation Error</p>
+                    <p>{generationError}</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="bg-purple-50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <h3 className="text-lg font-semibold">{previewTopic.trim() || 'Sample Blog Post'}</h3>
+                        <span className="bg-purple-100 text-purple-900 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                          WITH BRAND VOICE APPLIED
+                        </span>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 min-h-[400px]">
+                        {isLoadingWithBrandVoice ? (
+                          <div className="flex items-center justify-center h-full">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+                          </div>
+                        ) : !generatedContentWithBrandVoice ? (
+                          <div className="animate-pulse space-y-3">
+                            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                            <div className="h-4 bg-gray-200 rounded"></div>
+                            <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                            <div className="h-4 bg-gray-200 rounded w-2/3"></div>
                           </div>
                         ) : (
-                          <textarea
-                            value={previewOutline}
-                            onChange={(e) => setPreviewOutline(e.target.value)}
-                            placeholder="Enter or generate an outline for your content..."
-                            className="w-full h-[400px] p-3 border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          <ContentDisplay
+                            content={generatedContentWithBrandVoice}
+                            className="prose prose-sm max-w-none text-gray-800 leading-relaxed"
                           />
                         )}
-                        
-                        <div className="flex items-center mt-2">
-                          <button 
-                            onClick={generateOutline}
-                            className="flex items-center text-indigo-600 hover:text-indigo-800 text-xs"
-                            disabled={!previewTopic.trim()}
-                          >
-                            <Zap className="h-3.5 w-3.5 mr-1" />
-                            Generate response
-                          </button>
-                          <div className="whitespace-nowrap ml-auto mr-3">
-                            <span className="flex gap-1 items-center pl-3 text-caption whitespace-pre-line">
-                              <span data-testid="input-message" className="text-gray-600 text-xs">
-                                {previewOutline.length} / 10000
-                              </span>
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end">
-                          <button 
-                            onClick={() => {
-                              setIsOutlineExpanded(false);
-                              // Wait for animation to complete before proceeding
-                              setTimeout(() => {
-                                generatePreview();
-                              }, 300);
-                            }}
-                            className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
-                          >
-                            Next
-                          </button>
-                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-                
-                {/* Generate button at the bottom of the left column */}
-                <div className="mt-6 pt-4 border-t border-gray-200">
-                  <button 
-                    onClick={generateContent}
-                    className="w-full px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium flex items-center justify-center"
-                    disabled={isGeneratingContent || !previewTopic.trim()}
-                  >
-                    {isGeneratingContent ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="h-4 w-4 mr-2" />
-                        Generate
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-              
-              {/* Right column - Preview comparison */}
-              <div className="lg:col-span-2">
-                {renderPreviewContent()}
+
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <h3 className="text-lg font-semibold">{previewTopic.trim() || 'Sample Blog Post'}</h3>
+                        <span className="bg-gray-200 text-gray-700 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                          WITHOUT BRAND VOICE APPLIED
+                        </span>
+                      </div>
+                      <div className="bg-white rounded-lg p-4 min-h-[400px]">
+                        {isLoadingWithoutBrandVoice ? (
+                          <div className="flex items-center justify-center h-full">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+                          </div>
+                        ) : !generatedContentWithoutBrandVoice ? (
+                          <div className="animate-pulse space-y-3">
+                            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                            <div className="h-4 bg-gray-200 rounded"></div>
+                            <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                            <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                          </div>
+                        ) : (
+                          <ContentDisplay
+                            content={generatedContentWithoutBrandVoice}
+                            className="prose prose-sm max-w-none text-gray-800 leading-relaxed"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
+import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/utils/supabase/server';
-import { callOpenAI } from '@/lib/agent/models/openai';
+import { callOpenAI, streamOpenAIResponse } from '@/lib/agent/models/openai';
 import { getContentTypeConfig } from '@/lib/agent/core/config';
 
+// Helper function to create a streaming text encoder
+function createEncoder() {
+  const encoder = new TextEncoder();
+  return (text: string) => encoder.encode(`data: ${text}\n\n`);
+}
+
 export async function POST(request: Request) {
+  const encoder = createEncoder();
+
   try {
     // Parse the request body
     const body = await request.json();
@@ -13,7 +22,8 @@ export async function POST(request: Request) {
       contentType = 'Blog Post',
       topic,
       outline,
-      withBrandVoice = true // Whether to apply brand voice or generate generic content
+      withBrandVoice = true, // Whether to apply brand voice or generate generic content
+      stream = false // Whether to stream the response
     } = body;
     
     if (!brandVoiceId || !topic) {
@@ -130,7 +140,45 @@ export async function POST(request: Request) {
     // Get configuration for this content type from centralized config
     const config = getContentTypeConfig(contentType);
     
-    // Call OpenAI to generate the content
+    if (stream) {
+      // Set up streaming response
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            // Call OpenAI with streaming enabled
+            const streamingResponse = await callOpenAI({
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+              ],
+              temperature: config.temperature,
+              max_tokens: config.maxTokens,
+              model: config.model,
+              stream: true,
+            }) as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
+
+            // Stream the response
+            for await (const chunk of streamOpenAIResponse(streamingResponse)) {
+              controller.enqueue(encoder(chunk));
+            }
+            controller.enqueue(encoder('[DONE]'));
+            controller.close();
+          } catch (error) {
+            controller.error(error);
+          }
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
+    }
+
+    // Non-streaming response
     const response = await callOpenAI({
       messages: [
         { role: 'system', content: systemPrompt },
@@ -139,7 +187,8 @@ export async function POST(request: Request) {
       temperature: config.temperature,
       max_tokens: config.maxTokens,
       model: config.model,
-    });
+      stream: false,
+    }) as { content: string; usage: OpenAI.Completions.CompletionUsage | undefined };
     
     return NextResponse.json({
       content: response.content,

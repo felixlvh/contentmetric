@@ -481,7 +481,7 @@ export default function BrandVoiceDetailsPage() {
       setIsLoadingWithoutBrandVoice(true);
       setGeneratedContentWithBrandVoice(null);
       setGeneratedContentWithoutBrandVoice(null);
-
+      
       const brandVoiceId = params.id;
 
       // Generate content with brand voice (streaming)
@@ -497,12 +497,12 @@ export default function BrandVoiceDetailsPage() {
           stream: true,
         }),
       });
-
+      
       if (!withBrandVoiceResponse.ok) {
         const error = await withBrandVoiceResponse.json();
         throw new Error(error.error || 'Failed to generate content');
       }
-
+      
       // Generate content without brand voice (streaming)
       const withoutBrandVoiceResponse = await fetch('/api/brand-voice-preview', {
         method: 'POST',
@@ -516,7 +516,7 @@ export default function BrandVoiceDetailsPage() {
           stream: true,
         }),
       });
-
+      
       if (!withoutBrandVoiceResponse.ok) {
         const error = await withoutBrandVoiceResponse.json();
         throw new Error(error.error || 'Failed to generate content');
@@ -535,7 +535,7 @@ export default function BrandVoiceDetailsPage() {
           setIsLoadingWithoutBrandVoice
         ),
       ]);
-
+      
     } catch (error) {
       console.error('Error generating content:', error);
       setGenerationError(error instanceof Error ? error.message : 'Failed to generate content');
@@ -835,106 +835,106 @@ export default function BrandVoiceDetailsPage() {
                   <h3 className="text-base font-medium mb-4 text-gray-900">How would you like to test your Brand Voice?</h3>
                   
                   <div className="space-y-4">
-                    {/* Content Type Dropdown */}
-                    <div>
-                      <div className="relative">
-                        <button 
-                          className="w-full flex justify-between items-center px-3 py-2 border border-gray-300 rounded-md text-left"
-                          onClick={toggleContentTypeDropdown}
-                        >
-                          <span>{previewContentType}</span>
-                          <ChevronDown className="h-4 w-4" />
-                        </button>
-                        
-                        {showContentTypeDropdown && (
-                          <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
-                            <button 
-                              className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${previewContentType === 'Blog Post' ? 'bg-gray-50 font-medium' : ''}`}
-                              onClick={() => selectContentType('Blog Post')}
-                            >
-                              Blog Post
-                            </button>
-                            <button 
-                              className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${previewContentType === 'LinkedIn Post' ? 'bg-gray-50 font-medium' : ''}`}
-                              onClick={() => selectContentType('LinkedIn Post')}
-                            >
-                              LinkedIn Post
-                            </button>
-                            <button 
-                              className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${previewContentType === 'Product Description' ? 'bg-gray-50 font-medium' : ''}`}
-                              onClick={() => selectContentType('Product Description')}
-                            >
-                              Product Description
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Topic Input with Dropdown */}
-                    <div className="border border-gray-200 rounded-md overflow-hidden">
+                  {/* Content Type Dropdown */}
+                  <div>
+                    <div className="relative">
                       <button 
-                        onClick={toggleTopicSection}
-                        className="w-full flex justify-between items-center px-3 py-2 bg-gray-50 text-left"
+                        className="w-full flex justify-between items-center px-3 py-2 border border-gray-300 rounded-md text-left"
+                        onClick={toggleContentTypeDropdown}
                       >
-                        <div className="flex items-center">
-                          <div className="mr-2">
-                            {isTopicFilled ? (
-                              <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-green-500 border-dashed bg-green-100"></div>
-                            ) : (
-                              <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-dashed border-gray-600"></div>
-                            )}
-                          </div>
-                          <span className="font-medium">Topic</span>
-                          {previewTopic && (
-                            <span className="ml-2 text-gray-500 truncate max-w-[150px]">
-                              {previewTopic}
-                            </span>
-                          )}
-                        </div>
-                        {isTopicExpanded ? (
-                          <ChevronUp className="h-4 w-4 text-gray-500" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 text-gray-500" />
-                        )}
+                        <span>{previewContentType}</span>
+                        <ChevronDown className="h-4 w-4" />
                       </button>
                       
-                      <div 
-                        className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                          isTopicExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
-                        }`}
-                      >
-                        <div className="p-3">
-                          <p className="text-xs text-gray-600 mb-2">What is the topic of your post?</p>
-                          <input
-                            type="text"
-                            value={previewTopic}
-                            onChange={(e) => setPreviewTopic(e.target.value)}
-                            placeholder="Enter a topic"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md mb-1 text-sm"
-                          />
-                          <div className="flex justify-end text-xs text-gray-500 mb-2">
-                            <span>{previewTopic.length} / 1000</span>
-                          </div>
-                          
-                          {/* Quick Picks Section - Always visible */}
-                          <div className="mb-4">
-                            <div className="space-y-2">
-                              <div className="flex items-center mb-2">
+                      {showContentTypeDropdown && (
+                        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+                          <button 
+                            className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${previewContentType === 'Blog Post' ? 'bg-gray-50 font-medium' : ''}`}
+                            onClick={() => selectContentType('Blog Post')}
+                          >
+                            Blog Post
+                          </button>
+                          <button 
+                            className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${previewContentType === 'LinkedIn Post' ? 'bg-gray-50 font-medium' : ''}`}
+                            onClick={() => selectContentType('LinkedIn Post')}
+                          >
+                            LinkedIn Post
+                          </button>
+                          <button 
+                            className={`w-full text-left px-3 py-2 hover:bg-gray-100 ${previewContentType === 'Product Description' ? 'bg-gray-50 font-medium' : ''}`}
+                            onClick={() => selectContentType('Product Description')}
+                          >
+                            Product Description
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Topic Input with Dropdown */}
+                  <div className="border border-gray-200 rounded-md overflow-hidden">
+                    <button 
+                      onClick={toggleTopicSection}
+                      className="w-full flex justify-between items-center px-3 py-2 bg-gray-50 text-left"
+                    >
+                      <div className="flex items-center">
+                        <div className="mr-2">
+                          {isTopicFilled ? (
+                            <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-green-500 border-dashed bg-green-100"></div>
+                          ) : (
+                            <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-dashed border-gray-600"></div>
+                          )}
+                        </div>
+                        <span className="font-medium">Topic</span>
+                        {previewTopic && (
+                          <span className="ml-2 text-gray-500 truncate max-w-[150px]">
+                            {previewTopic}
+                          </span>
+                        )}
+                      </div>
+                      {isTopicExpanded ? (
+                        <ChevronUp className="h-4 w-4 text-gray-500" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                      )}
+                    </button>
+                    
+                    <div 
+                      className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                        isTopicExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+                      }`}
+                    >
+                      <div className="p-3">
+                        <p className="text-xs text-gray-600 mb-2">What is the topic of your post?</p>
+                        <input
+                          type="text"
+                          value={previewTopic}
+                          onChange={(e) => setPreviewTopic(e.target.value)}
+                          placeholder="Enter a topic"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md mb-1 text-sm"
+                        />
+                        <div className="flex justify-end text-xs text-gray-500 mb-2">
+                          <span>{previewTopic.length} / 1000</span>
+                        </div>
+                        
+                        {/* Quick Picks Section - Always visible */}
+                        <div className="mb-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center mb-2">
                                 <Zap className="h-3.5 w-3.5 mr-1 text-indigo-600" />
                                 <span className="text-xs text-indigo-600">Quick picks</span>
-                              </div>
-                              {randomTopics.map((topic, index) => (
-                                <button 
-                                  key={index}
-                                  className="w-full text-left px-3 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-md text-xs"
-                                  onClick={() => setTopicAndSwitchToOutline(topic)}
-                                >
-                                  {topic}
-                                </button>
-                              ))}
                             </div>
+                            {randomTopics.map((topic, index) => (
+                              <button 
+                                key={index}
+                                className="w-full text-left px-3 py-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-md text-xs"
+                                onClick={() => setTopicAndSwitchToOutline(topic)}
+                              >
+                                {topic}
+                              </button>
+                            ))}
                           </div>
+                        </div>
 
                           <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end">
                             <button 
@@ -950,121 +950,121 @@ export default function BrandVoiceDetailsPage() {
                               Next
                             </button>
                           </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Outline Input with Dropdown */}
-                    <div className="border border-gray-200 rounded-md overflow-hidden">
-                      <button 
-                        onClick={toggleOutlineSection}
-                        className="w-full flex justify-between items-center px-3 py-2 bg-gray-50 text-left"
-                      >
-                        <div className="flex items-center">
-                          <div className="mr-2">
-                            {isOutlineFilled ? (
-                              <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-green-500 border-dashed bg-green-100"></div>
-                            ) : (
-                              <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-dashed border-gray-600"></div>
-                            )}
-                          </div>
-                          <span className="font-medium">Outline</span>
-                        </div>
-                        {isOutlineExpanded ? (
-                          <ChevronUp className="h-4 w-4 text-gray-500" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 text-gray-500" />
-                        )}
-                      </button>
-                      
-                      <div 
-                        className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                          isOutlineExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
-                        }`}
-                      >
-                        <div className="p-3">
-                          <p className="text-xs text-gray-600 mb-2">What is the outline of your post?</p>
-                          {/* Show loading indicator during outline generation */}
-                          {isGeneratingOutline ? (
-                            <div className="flex items-center justify-center py-4">
-                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500"></div>
-                              <span className="ml-2 text-sm text-gray-600">Generating outline...</span>
-                            </div>
-                          ) : (
-                            <textarea
-                              value={previewOutline}
-                              onChange={(e) => setPreviewOutline(e.target.value)}
-                              placeholder="Enter or generate an outline for your content..."
-                              className="w-full h-[300px] p-3 border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                            />
-                          )}
-                          
-                          <div className="flex items-center mt-2">
-                            <button 
-                              onClick={generateOutline}
-                              className="flex items-center text-indigo-600 hover:text-indigo-800 text-xs"
-                              disabled={!previewTopic.trim()}
-                            >
-                              <Zap className="h-3.5 w-3.5 mr-1" />
-                              Generate response
-                            </button>
-                            <div className="whitespace-nowrap ml-auto mr-3">
-                              <span className="flex gap-1 items-center pl-3 text-caption whitespace-pre-line">
-                                <span data-testid="input-message" className="text-gray-600 text-xs">
-                                  {previewOutline.length} / 10000
-                                </span>
-                              </span>
-                            </div>
-                          </div>
-                          
-                          <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end">
-                            <button 
-                              onClick={() => {
-                                setIsOutlineExpanded(false);
-                                // Wait for animation to complete before proceeding
-                                setTimeout(() => {
-                                  generatePreview();
-                                }, 300);
-                              }}
-                              className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
-                            >
-                              Next
-                            </button>
-                          </div>
-                        </div>
                       </div>
                     </div>
                   </div>
                   
-                  {/* Generate button */}
-                  <div className="mt-6">
+                  {/* Outline Input with Dropdown */}
+                  <div className="border border-gray-200 rounded-md overflow-hidden">
                     <button 
-                      onClick={generateContent}
-                      className="w-full px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={isGeneratingContent || !previewTopic.trim()}
+                      onClick={toggleOutlineSection}
+                      className="w-full flex justify-between items-center px-3 py-2 bg-gray-50 text-left"
                     >
-                      {isGeneratingContent ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Generating...
-                        </>
+                      <div className="flex items-center">
+                        <div className="mr-2">
+                          {isOutlineFilled ? (
+                            <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-green-500 border-dashed bg-green-100"></div>
+                          ) : (
+                            <div className="ml-0.5 w-3.5 h-3.5 rounded-full border border-dashed border-gray-600"></div>
+                          )}
+                        </div>
+                        <span className="font-medium">Outline</span>
+                      </div>
+                      {isOutlineExpanded ? (
+                        <ChevronUp className="h-4 w-4 text-gray-500" />
                       ) : (
-                        <>
-                          <Zap className="h-4 w-4 mr-2" />
-                          Generate
-                        </>
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
                       )}
                     </button>
+                    
+                    <div 
+                      className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                        isOutlineExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+                      }`}
+                    >
+                      <div className="p-3">
+                        <p className="text-xs text-gray-600 mb-2">What is the outline of your post?</p>
+                        {/* Show loading indicator during outline generation */}
+                        {isGeneratingOutline ? (
+                          <div className="flex items-center justify-center py-4">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-500"></div>
+                            <span className="ml-2 text-sm text-gray-600">Generating outline...</span>
+                          </div>
+                        ) : (
+                          <textarea
+                            value={previewOutline}
+                            onChange={(e) => setPreviewOutline(e.target.value)}
+                            placeholder="Enter or generate an outline for your content..."
+                              className="w-full h-[300px] p-3 border rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          />
+                        )}
+                        
+                        <div className="flex items-center mt-2">
+                          <button 
+                            onClick={generateOutline}
+                            className="flex items-center text-indigo-600 hover:text-indigo-800 text-xs"
+                            disabled={!previewTopic.trim()}
+                          >
+                            <Zap className="h-3.5 w-3.5 mr-1" />
+                            Generate response
+                          </button>
+                          <div className="whitespace-nowrap ml-auto mr-3">
+                            <span className="flex gap-1 items-center pl-3 text-caption whitespace-pre-line">
+                              <span data-testid="input-message" className="text-gray-600 text-xs">
+                                {previewOutline.length} / 10000
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end">
+                          <button 
+                            onClick={() => {
+                              setIsOutlineExpanded(false);
+                              // Wait for animation to complete before proceeding
+                              setTimeout(() => {
+                                generatePreview();
+                              }, 300);
+                            }}
+                            className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-
+                
+                  {/* Generate button */}
+                  <div className="mt-6">
+                  <button 
+                    onClick={generateContent}
+                      className="w-full px-6 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isGeneratingContent || !previewTopic.trim()}
+                  >
+                    {isGeneratingContent ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="h-4 w-4 mr-2" />
+                        Generate
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+              
                 {/* Preview content */}
                 {generationError ? (
                   <div className="col-span-2 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
                     <p className="font-medium">Generation Error</p>
                     <p>{generationError}</p>
-                  </div>
-                ) : (
+                      </div>
+                    ) : (
                   <>
                     <div className="bg-purple-50 rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-4">
@@ -1080,47 +1080,47 @@ export default function BrandVoiceDetailsPage() {
                           </div>
                         ) : !generatedContentWithBrandVoice ? (
                           <div className="animate-pulse space-y-3">
-                            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
                             <div className="h-4 bg-gray-200 rounded"></div>
                             <div className="h-4 bg-gray-200 rounded w-5/6"></div>
                             <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                          </div>
+                      </div>
                         ) : (
                           <ContentDisplay
                             content={generatedContentWithBrandVoice}
                             className="prose prose-sm max-w-none text-gray-800 leading-relaxed"
                           />
-                        )}
-                      </div>
-                    </div>
-
+                    )}
+                  </div>
+                </div>
+                
                     <div className="bg-gray-50 rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-4">
                         <h3 className="text-lg font-semibold">{previewTopic.trim() || 'Sample Blog Post'}</h3>
                         <span className="bg-gray-200 text-gray-700 text-xs font-medium px-2.5 py-0.5 rounded-full">
                           WITHOUT BRAND VOICE APPLIED
                         </span>
-                      </div>
+                  </div>
                       <div className="bg-white rounded-lg p-4 min-h-[400px]">
                         {isLoadingWithoutBrandVoice ? (
                           <div className="flex items-center justify-center h-full">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
-                          </div>
+                      </div>
                         ) : !generatedContentWithoutBrandVoice ? (
                           <div className="animate-pulse space-y-3">
-                            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
                             <div className="h-4 bg-gray-200 rounded"></div>
                             <div className="h-4 bg-gray-200 rounded w-5/6"></div>
                             <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                          </div>
+                      </div>
                         ) : (
                           <ContentDisplay
                             content={generatedContentWithoutBrandVoice}
                             className="prose prose-sm max-w-none text-gray-800 leading-relaxed"
                           />
-                        )}
-                      </div>
-                    </div>
+                    )}
+                  </div>
+                </div>
                   </>
                 )}
               </div>

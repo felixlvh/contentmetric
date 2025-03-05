@@ -1,129 +1,106 @@
 import { NextResponse } from 'next/server';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
-import { generateContent } from '../../../lib/ai/services/generation-service';
-import { callOpenAI } from '../../../lib/ai/models/openai';
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const SYSTEM_PROMPT = `You are an AI writing assistant that helps improve text. Follow these rules:
+1. Maintain the original meaning and key information
+2. Keep the tone appropriate for the context
+3. Be concise and clear
+4. Fix any grammar or spelling errors
+5. Use active voice when possible
+6. Make the text more engaging`;
+
+interface RequestBody {
+  prompt: 'improve' | 'expand' | 'summarize' | 'fix_grammar' | 'change_tone' | 'generate';
+  content: string;
+  tone?: string;
+}
 
 export async function POST(request: Request) {
-  try {
-    console.log('Agent API route called');
-    
-    // Get the cookie store
-    const cookieStore = await cookies();
-    
-    // Initialize Supabase client
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookieStore.get(name)?.value;
-          },
-          set(_name: string, _value: string, _options: any) {
-            // Route handlers can only read cookies
-          },
-          remove(_name: string, _options: any) {
-            // Route handlers can only read cookies
-          },
+  // Check authentication
+  const cookieStore = cookies();
+  
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          const cookie = cookieStore.get(name);
+          return cookie?.value;
         },
+        set(name: string, value: string, options: CookieOptions) {
+          cookieStore.set(name, value);
+        },
+        remove(name: string, _options: CookieOptions) {
+          cookieStore.delete(name);
+        }
       }
-    );
-    
-    // Get the current session
-    console.log('Getting user session');
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError) {
-      console.error('Session error:', sessionError);
-      return NextResponse.json({ error: 'Authentication error: ' + sessionError.message }, { status: 401 });
     }
-    
-    if (!session?.user) {
-      console.error('No user session found');
-      return NextResponse.json({ error: 'Unauthorized: No session found' }, { status: 401 });
+  );
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const body: RequestBody = await request.json();
+    const { prompt, content, tone } = body;
+
+    if (!content) {
+      return NextResponse.json({ error: 'Content is required' }, { status: 400 });
     }
-    
-    console.log('User authenticated:', session.user.id);
-    
-    // Parse request body
-    let body;
-    try {
-      body = await request.json();
-      console.log('Request body parsed, prompt length:', body.prompt?.length || 0);
-    } catch (error) {
-      console.error('Error parsing request body:', error);
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+
+    let userPrompt = '';
+    switch (prompt) {
+      case 'improve':
+        userPrompt = `Improve this text while maintaining its meaning: "${content}"`;
+        break;
+      case 'expand':
+        userPrompt = `Expand this text with more details while maintaining its style: "${content}"`;
+        break;
+      case 'summarize':
+        userPrompt = `Summarize this text while keeping the key points: "${content}"`;
+        break;
+      case 'fix_grammar':
+        userPrompt = `Fix any grammar and spelling errors in this text: "${content}"`;
+        break;
+      case 'change_tone':
+        userPrompt = `Rewrite this text in a ${tone || 'professional'} tone: "${content}"`;
+        break;
+      case 'generate':
+        userPrompt = `Write a short paragraph about: ${content}`;
+        break;
+      default:
+        return NextResponse.json({ error: 'Invalid prompt type' }, { status: 400 });
     }
-    
-    const { 
-      prompt, 
-      documentId, 
-      brandVoiceId,
-      styleGuideId,
-      visualGuidelinesId,
-      contentType = 'text',
-      context = {}
-    } = body;
-    
-    // Validate input
-    if (!prompt || typeof prompt !== 'string') {
-      console.error('Invalid prompt:', prompt);
-      return NextResponse.json(
-        { error: 'Prompt is required and must be a string' },
-        { status: 400 }
-      );
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 500,
+    });
+
+    const improvedText = completion.choices[0]?.message?.content;
+    if (!improvedText) {
+      throw new Error('No response from AI');
     }
-    
-    // Generate content
-    console.log('Generating content');
-    try {
-      const response = await generateContent({
-        prompt,
-        documentId,
-        userId: session.user.id,
-        brandVoiceId,
-        styleGuideId,
-        visualGuidelinesId,
-      });
-      
-      console.log('Content generated, length:', response.content.length);
-      
-      // Check for brand voice violations if a brand voice is specified
-      let brandVoiceAnalysis = null;
-      if (brandVoiceId) {
-        console.log('Analyzing content for brand voice compliance');
-        brandVoiceAnalysis = await analyzeBrandVoiceCompliance(
-          prompt, 
-          response.content, 
-          brandVoiceId,
-          supabase
-        );
-      }
-      
-      // Generate follow-up suggestions
-      console.log('Generating suggestions');
-      const suggestionsResponse = await generateSuggestions(prompt, response.content);
-      console.log('Suggestions generated:', suggestionsResponse.length);
-      
-      return NextResponse.json({
-        content: response.content,
-        suggestions: suggestionsResponse,
-        brandVoiceAnalysis,
-        contentType,
-      });
-    } catch (generationError) {
-      console.error('Error generating content:', generationError);
-      return NextResponse.json(
-        { error: 'Content generation failed: ' + (generationError instanceof Error ? generationError.message : 'Unknown error') },
-        { status: 500 }
-      );
-    }
-  } catch (error: unknown) {
-    console.error('Unhandled agent error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    return NextResponse.json({ content: improvedText });
+  } catch (error) {
+    console.error('Error processing text:', error);
     return NextResponse.json(
-      { error: 'Failed to process request: ' + errorMessage },
+      { error: 'Failed to process text' },
       { status: 500 }
     );
   }

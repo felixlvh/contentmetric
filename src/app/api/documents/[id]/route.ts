@@ -27,6 +27,7 @@ function getClient() {
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   const supabase = getClient();
+  const documentId = params.id;
   
   try {
     // Get authenticated user
@@ -39,7 +40,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const { data: document, error } = await supabase
       .from('documents')
       .select('*')
-      .eq('id', await params.id)
+      .eq('id', documentId)
       .single();
 
     if (error) {
@@ -60,6 +61,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const supabase = getClient();
+  const documentId = params.id;
   
   try {
     // Get authenticated user
@@ -76,7 +78,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const { data: existingDoc, error: fetchError } = await supabase
       .from('documents')
       .select('user_id')
-      .eq('id', await params.id)
+      .eq('id', documentId)
       .single();
 
     if (fetchError || !existingDoc) {
@@ -97,7 +99,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         status,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', await params.id)
+      .eq('id', documentId)
       .select()
       .single();
 
@@ -117,6 +119,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   const supabase = getClient();
+  const documentId = params.id;
   
   try {
     // Get authenticated user
@@ -130,7 +133,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     const { data: existingDoc, error: fetchError } = await supabase
       .from('documents')
       .select('user_id')
-      .eq('id', await params.id)
+      .eq('id', documentId)
       .single();
 
     if (fetchError || !existingDoc) {
@@ -146,7 +149,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     const { error: deleteError } = await supabase
       .from('documents')
       .delete()
-      .eq('id', await params.id);
+      .eq('id', documentId);
 
     if (deleteError) {
       throw deleteError;
@@ -160,4 +163,4 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       { status: 500 }
     );
   }
-} 
+}

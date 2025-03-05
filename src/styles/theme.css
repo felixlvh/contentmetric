@@ -1,0 +1,32 @@
+@layer base {
+  :root {
+    --font-sans: Switzer, system-ui, sans-serif;
+    --radius-4xl: 2rem;
+  }
+}
+
+@keyframes move-x {
+  0% {
+    transform: translateX(var(--move-x-from));
+  }
+  100% {
+    transform: translateX(var(--move-x-to));
+  }
+}
+
+/* Theme-specific utility classes */
+.theme-gradient {
+  @apply bg-gradient-to-r from-blue-500 to-purple-600;
+}
+
+.theme-text-gradient {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-600;
+}
+
+.theme-button {
+  @apply inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 active:bg-gray-800 active:text-white/80;
+}
+
+.theme-container {
+  @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+} 

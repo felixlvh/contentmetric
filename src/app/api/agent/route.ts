@@ -21,6 +21,45 @@ interface RequestBody {
   tone?: string;
 }
 
+function chunkContent(content: string, maxChunkSize: number = 4000): string[] {
+  const sentences = content.match(/[^.!?]+[.!?]+/g) || [content];
+  const chunks: string[] = [];
+  let currentChunk = '';
+
+  for (const sentence of sentences) {
+    if ((currentChunk + sentence).length <= maxChunkSize) {
+      currentChunk += sentence;
+    } else {
+      if (currentChunk) chunks.push(currentChunk.trim());
+      currentChunk = sentence;
+    }
+  }
+
+  if (currentChunk) chunks.push(currentChunk.trim());
+  return chunks;
+}
+
+async function processContentChunksParallel(chunks: string[], prompt: string, systemPrompt: string): Promise<string> {
+  // Process chunks in parallel instead of sequentially
+  const promises = chunks.map(async (chunk) => {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `${prompt} "${chunk}"` },
+      ],
+      temperature: 0.7,
+      max_tokens: 500,
+    });
+
+    return completion.choices[0]?.message?.content || '';
+  });
+
+  // Wait for all chunks to be processed
+  const results = await Promise.all(promises);
+  return results.join(' ');
+}
+
 export async function POST(request: Request) {
   // Check authentication
   const cookieStore = cookies();
@@ -31,19 +70,17 @@ export async function POST(request: Request) {
     {
       cookies: {
         get(name: string) {
-          const cookie = cookieStore.get(name);
-          return cookie?.value;
+          return cookieStore.get(name)?.value;
         },
         set(name: string, value: string, options: CookieOptions) {
-          cookieStore.set(name, value);
+          cookieStore.set({ name, value, ...options });
         },
-        remove(name: string, _options: CookieOptions) {
-          cookieStore.delete(name);
+        remove(name: string, options: CookieOptions) {
+          cookieStore.delete({ name, ...options });
         }
       }
     }
   );
-
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -60,38 +97,52 @@ export async function POST(request: Request) {
     let userPrompt = '';
     switch (prompt) {
       case 'improve':
-        userPrompt = `Improve this text while maintaining its meaning: "${content}"`;
+        userPrompt = 'Improve this text while maintaining its meaning:';
         break;
       case 'expand':
-        userPrompt = `Expand this text with more details while maintaining its style: "${content}"`;
+        userPrompt = 'Expand this text with more details while maintaining its style:';
         break;
       case 'summarize':
-        userPrompt = `Summarize this text while keeping the key points: "${content}"`;
+        userPrompt = 'Summarize this text while keeping the key points:';
         break;
       case 'fix_grammar':
-        userPrompt = `Fix any grammar and spelling errors in this text: "${content}"`;
+        userPrompt = 'Fix any grammar and spelling errors in this text:';
         break;
       case 'change_tone':
-        userPrompt = `Rewrite this text in a ${tone || 'professional'} tone: "${content}"`;
+        userPrompt = `Rewrite this text in a ${tone || 'professional'} tone:`;
         break;
       case 'generate':
-        userPrompt = `Write a short paragraph about: ${content}`;
+        userPrompt = 'Write a short paragraph about:';
         break;
       default:
         return NextResponse.json({ error: 'Invalid prompt type' }, { status: 400 });
     }
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 500,
-    });
+    // For small content (less than 1000 chars), process directly without chunking for speed
+    if (content.length < 1000) {
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: `${userPrompt} "${content}"` },
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+      });
 
-    const improvedText = completion.choices[0]?.message?.content;
+      const improvedText = completion.choices[0]?.message?.content;
+      
+      if (!improvedText) {
+        throw new Error('No response from AI');
+      }
+
+      return NextResponse.json({ content: improvedText });
+    }
+    
+    // For larger content, split into chunks and process in parallel
+    const chunks = chunkContent(content);
+    const improvedText = await processContentChunksParallel(chunks, userPrompt, SYSTEM_PROMPT);
+
     if (!improvedText) {
       throw new Error('No response from AI');
     }
@@ -166,7 +217,7 @@ async function analyzeBrandVoiceCompliance(
       let contentToParse = response.content;
       
       // Check if the response is wrapped in markdown code blocks
-      const jsonRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/;
+      const jsonRegex = /```(?:json)?\s*([\s\S]*?\})\s*```/;
       const match = contentToParse.match(jsonRegex);
       
       if (match && match[1]) {
@@ -224,4 +275,4 @@ async function generateSuggestions(prompt: string, content: string): Promise<str
     console.error('Error generating suggestions:', error);
     return [];
   }
-} 
+}

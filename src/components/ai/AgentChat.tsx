@@ -71,7 +71,8 @@ export default function AgentChat({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: content,
+          prompt: 'improve',
+          content: content,
           documentId,
           brandVoiceId,
           context: {
@@ -309,4 +310,4 @@ export default function AgentChat({
       </div>
     </div>
   );
-} 
+}

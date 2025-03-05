@@ -1,6 +1,42 @@
 'use client';
 
-import React from 'react';
+import { clsx } from 'clsx'
+import React from 'react'
+
+interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
+  className?: string
+  /**
+   * The width of the skeleton
+   * @default 'full'
+   */
+  width?: 'full' | number | string
+  /**
+   * The height of the skeleton
+   * @default 20
+   */
+  height?: number | string
+}
+
+/**
+ * Base skeleton component that all other skeletons are built upon
+ */
+function Skeleton({ className, width = 'full', height = 20, ...props }: SkeletonProps) {
+  const widthClass = width === 'full' ? 'w-full' : typeof width === 'number' ? `w-[${width}px]` : `w-[${width}]`
+  
+  return (
+    <div
+      className={clsx(
+        'animate-pulse rounded bg-gray-200',
+        widthClass,
+        typeof height === 'number' ? `h-[${height}px]` : `h-[${height}]`,
+        className
+      )}
+      role="status"
+      aria-label="Loading..."
+      {...props}
+    />
+  )
+}
 
 /**
  * Generic page header skeleton with title and action buttons
@@ -33,31 +69,53 @@ export function CardSkeleton() {
   );
 }
 
+interface GridSkeletonProps {
+  columns?: number
+  items?: number
+  className?: string
+}
+
 /**
  * Grid of card skeletons
  */
-export function GridSkeleton({ columns = 3, items = 3 }) {
+export function GridSkeleton({ columns = 3, items = 3, className }: GridSkeletonProps) {
   return (
-    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${columns} gap-6`}>
+    <div 
+      className={clsx(
+        'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6',
+        className
+      )}
+      role="status"
+      aria-label="Loading grid items..."
+    >
       {[...Array(items)].map((_, index) => (
         <CardSkeleton key={index} />
       ))}
     </div>
-  );
+  )
+}
+
+interface TableSkeletonProps {
+  rows?: number
+  className?: string
 }
 
 /**
  * Table skeleton for data listings
  */
-export function TableSkeleton({ rows = 5 }) {
+export function TableSkeleton({ rows = 5, className }: TableSkeletonProps) {
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="h-12 w-full bg-gray-100 animate-pulse"></div>
+    <div 
+      className={clsx('bg-white rounded-lg shadow overflow-hidden', className)}
+      role="status"
+      aria-label="Loading table data..."
+    >
+      <Skeleton height={48} className="bg-gray-100" />
       {[...Array(rows)].map((_, index) => (
-        <div key={index} className="h-16 w-full bg-white border-b border-gray-200 animate-pulse"></div>
+        <Skeleton key={index} height={64} className="border-b border-gray-200" />
       ))}
     </div>
-  );
+  )
 }
 
 /**
@@ -65,11 +123,11 @@ export function TableSkeleton({ rows = 5 }) {
  */
 export function FormFieldSkeleton() {
   return (
-    <div className="mb-6">
-      <div className="h-4 w-32 bg-gray-200 rounded animate-pulse mb-2"></div>
-      <div className="h-10 w-full bg-gray-200 rounded animate-pulse"></div>
+    <div className="mb-6" role="status" aria-label="Loading form field...">
+      <Skeleton width={128} height={16} className="mb-2" />
+      <Skeleton height={40} />
     </div>
-  );
+  )
 }
 
 /**
@@ -77,17 +135,17 @@ export function FormFieldSkeleton() {
  */
 export function TextAreaSkeleton() {
   return (
-    <div className="mb-6">
-      <div className="h-4 w-20 bg-gray-200 rounded animate-pulse mb-2"></div>
+    <div className="mb-6" role="status" aria-label="Loading text editor...">
+      <Skeleton width={80} height={16} className="mb-2" />
       <div className="min-h-[300px] border border-gray-200 rounded-md p-4 bg-gray-50">
-        <div className="h-4 w-full bg-gray-200 rounded animate-pulse mb-3"></div>
-        <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse mb-3"></div>
-        <div className="h-4 w-5/6 bg-gray-200 rounded animate-pulse mb-3"></div>
-        <div className="h-4 w-2/3 bg-gray-200 rounded animate-pulse mb-3"></div>
-        <div className="h-4 w-4/5 bg-gray-200 rounded animate-pulse"></div>
+        <Skeleton height={16} className="mb-3" />
+        <Skeleton width="75%" height={16} className="mb-3" />
+        <Skeleton width="83%" height={16} className="mb-3" />
+        <Skeleton width="66%" height={16} className="mb-3" />
+        <Skeleton width="80%" height={16} />
       </div>
     </div>
-  );
+  )
 }
 
 /**

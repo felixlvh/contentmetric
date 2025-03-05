@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: Switzer, system-ui, sans-serif;
+  --radius-4xl: 2rem;
+  --spacing: 0.5rem;
+}
+
+@function spacing($multiplier) {
+  @return calc(var(--spacing) * $multiplier);
+}
+
+@keyframes move-x {
+  0% {
+    transform: translateX(var(--move-x-from));
+  }
+  100% {
+    transform: translateX(var(--move-x-to));
+  }
+}

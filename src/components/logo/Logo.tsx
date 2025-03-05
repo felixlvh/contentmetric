@@ -21,19 +21,19 @@ export const Logo: React.FC<LogoProps> = ({
   // Size classes for the logo text and dot
   const sizeClasses = {
     sm: {
-      text: 'text-lg',
-      dot: 'text-xl',
-      tagline: 'text-xs'
+      text: 'text-2xl',
+      dot: 'text-lg',
+      tagline: 'text-base'
     },
     md: {
-      text: 'text-xl',
-      dot: 'text-2xl',
-      tagline: 'text-sm'
+      text: 'text-3xl',
+      dot: 'text-xl',
+      tagline: 'text-lg'
     },
     lg: {
-      text: 'text-[48px]',
+      text: 'text-[70px]',
       dot: 'text-2xl',
-      tagline: 'text-base'
+      tagline: 'text-xl'
     }
   };
 
@@ -47,8 +47,8 @@ export const Logo: React.FC<LogoProps> = ({
           className={cn('text-[#6366F1] animate-pulse absolute', sizeClasses[size].dot)} 
           style={{ 
             animation: 'pulse 2s cubic-bezier(.4,0,.6,1) infinite',
-            bottom: '10px',
-            right: '-10px',
+            bottom: size === 'lg' ? '-2px' : '-1px',
+            right: size === 'lg' ? '10px' : '-7px',
             letterSpacing: '-0.05em'
           }}
         >
